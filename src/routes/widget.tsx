@@ -39,7 +39,7 @@ const SOURCE_TYPES = [
 ];
 
 function WidgetPage() {
-  const [slug, setSlug] = useState(institutions[0].slug);
+  const [slug, setSlug] = useState(institutions[0]!.slug);
   const [goal, setGoal] = useState("");
   const [types, setTypes] = useState<string[]>(["Peer-reviewed articles"]);
   const [results, setResults] = useState<MatchedResource[] | null>(null);

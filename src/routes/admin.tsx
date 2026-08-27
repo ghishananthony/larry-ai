@@ -40,7 +40,7 @@ const statusDot: Record<ResourceStatus, string> = {
 };
 
 function AdminPage() {
-  const [slug, setSlug] = useState(institutions[0].slug);
+  const [slug, setSlug] = useState(institutions[0]!.slug);
   const institution = getInstitution(slug);
   const licensed = institution.resources.filter((r) => r.status === "active" || r.status === "trial");
   const queries = institution.resources.reduce((n, r) => n + r.monthlyQueries, 0);

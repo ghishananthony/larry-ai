@@ -192,7 +192,7 @@ export const institutions: Institution[] = [
 ];
 
 export function getInstitution(slug: string): Institution {
-  return institutions.find((i) => i.slug === slug) ?? institutions[0];
+  return institutions.find((i) => i.slug === slug) ?? institutions[0]!;
 }
 
 const disciplineKeywords: Record<string, string[]> = {
