@@ -14,16 +14,307 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      admin_access_requests: {
+        Row: {
+          contact_email: string
+          created_at: string
+          id: string
+          institution_id: string
+          justification: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          contact_email: string
+          created_at?: string
+          id?: string
+          institution_id: string
+          justification?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          contact_email?: string
+          created_at?: string
+          id?: string
+          institution_id?: string
+          justification?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_access_requests_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      institution_settings: {
+        Row: {
+          default_auth_method: string
+          embed_key: string
+          institution_id: string
+          notes: string
+          proxy_prefix: string
+          updated_at: string
+        }
+        Insert: {
+          default_auth_method?: string
+          embed_key?: string
+          institution_id: string
+          notes?: string
+          proxy_prefix?: string
+          updated_at?: string
+        }
+        Update: {
+          default_auth_method?: string
+          embed_key?: string
+          institution_id?: string
+          notes?: string
+          proxy_prefix?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "institution_settings_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: true
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      institutions: {
+        Row: {
+          catalog_name: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          short_name: string
+          slug: string
+        }
+        Insert: {
+          catalog_name: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          short_name: string
+          slug: string
+        }
+        Update: {
+          catalog_name?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          short_name?: string
+          slug?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          institution_id: string | null
+          marketing_opt_in: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          full_name?: string
+          id: string
+          institution_id?: string | null
+          marketing_opt_in?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          full_name?: string
+          id?: string
+          institution_id?: string | null
+          marketing_opt_in?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      resources: {
+        Row: {
+          auth_method: string
+          created_at: string
+          description: string
+          disciplines: string[]
+          id: string
+          institution_id: string
+          kind: string
+          monthly_queries: number
+          name: string
+          provider: string
+          source_types: string[]
+          status: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          auth_method?: string
+          created_at?: string
+          description?: string
+          disciplines?: string[]
+          id?: string
+          institution_id: string
+          kind?: string
+          monthly_queries?: number
+          name: string
+          provider?: string
+          source_types?: string[]
+          status?: string
+          updated_at?: string
+          url?: string
+        }
+        Update: {
+          auth_method?: string
+          created_at?: string
+          description?: string
+          disciplines?: string[]
+          id?: string
+          institution_id?: string
+          kind?: string
+          monthly_queries?: number
+          name?: string
+          provider?: string
+          source_types?: string[]
+          status?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resources_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      usage_events: {
+        Row: {
+          created_at: string
+          event_type: string
+          id: string
+          institution_id: string
+          resource_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_type?: string
+          id?: string
+          institution_id: string
+          resource_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          id?: string
+          institution_id?: string
+          resource_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usage_events_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "usage_events_resource_id_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          institution_id: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          institution_id?: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          institution_id?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      current_institution: { Args: { _user_id: string }; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      manages_institution: {
+        Args: { _institution_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "student" | "college_admin" | "super_admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +441,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["student", "college_admin", "super_admin"],
+    },
   },
 } as const
