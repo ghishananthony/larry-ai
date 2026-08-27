@@ -28,7 +28,7 @@ export const Route = createFileRoute("/widget")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: WidgetPage;
+  component: WidgetPage,
 });
 
 const SOURCE_TYPES = [
