@@ -95,31 +95,100 @@ export type Database = {
       }
       institutions: {
         Row: {
+          annual_price_cents: number
+          billing_status: string
           catalog_name: string
           created_at: string
+          email_domains: string[]
           id: string
+          implementation_fee_cents: number
           is_active: boolean
           name: string
+          plan_code: string
+          renewal_on: string | null
           short_name: string
           slug: string
+          subscription_started_on: string | null
+          subscription_status: string
         }
         Insert: {
+          annual_price_cents?: number
+          billing_status?: string
           catalog_name: string
           created_at?: string
+          email_domains?: string[]
           id?: string
+          implementation_fee_cents?: number
           is_active?: boolean
           name: string
+          plan_code?: string
+          renewal_on?: string | null
           short_name: string
           slug: string
+          subscription_started_on?: string | null
+          subscription_status?: string
         }
         Update: {
+          annual_price_cents?: number
+          billing_status?: string
           catalog_name?: string
           created_at?: string
+          email_domains?: string[]
           id?: string
+          implementation_fee_cents?: number
           is_active?: boolean
           name?: string
+          plan_code?: string
+          renewal_on?: string | null
           short_name?: string
           slug?: string
+          subscription_started_on?: string | null
+          subscription_status?: string
+        }
+        Relationships: []
+      }
+      pricing_plans: {
+        Row: {
+          annual_price_cents: number
+          code: string
+          created_at: string
+          features: string[]
+          id: string
+          implementation_fee_cents: number
+          is_active: boolean
+          is_custom: boolean
+          name: string
+          sort_order: number
+          tagline: string
+          updated_at: string
+        }
+        Insert: {
+          annual_price_cents?: number
+          code: string
+          created_at?: string
+          features?: string[]
+          id?: string
+          implementation_fee_cents?: number
+          is_active?: boolean
+          is_custom?: boolean
+          name: string
+          sort_order?: number
+          tagline?: string
+          updated_at?: string
+        }
+        Update: {
+          annual_price_cents?: number
+          code?: string
+          created_at?: string
+          features?: string[]
+          id?: string
+          implementation_fee_cents?: number
+          is_active?: boolean
+          is_custom?: boolean
+          name?: string
+          sort_order?: number
+          tagline?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -299,6 +368,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_institution_access: {
+        Args: { _institution_id: string }
+        Returns: Json
+      }
       current_institution: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
