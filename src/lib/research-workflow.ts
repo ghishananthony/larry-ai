@@ -53,6 +53,8 @@ const umbrellaConcepts: { term: string; aliases: string[]; facets: string[] }[] 
     term: "mental health",
     aliases: ["mental health", "psychological health", "mental wellbeing", "mental well-being"],
     facets: ["anxiety", "depression", "self-esteem", "self esteem", "stress", "loneliness", "body image", "sleep"],
+    // "self esteem" is only an alternate spelling used for detection, not a second example.
+
   },
   {
     term: "wellbeing",
