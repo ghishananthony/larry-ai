@@ -181,10 +181,17 @@ export function analyzeRequest(goal: string): RequestAnalysis {
     new Set(KNOWN_CONCEPTS.filter((c) => text.includes(c.toLowerCase()))),
   );
 
-  const ambiguousTerms = umbrellaConcepts
-    .filter((u) => u.aliases.some((a) => text.includes(a)))
-    .filter((u) => !u.facets.some((f) => text.includes(f)))
-    .map((u) => u.term);
+  const matchedUmbrellas = umbrellaConcepts
+    .map((u) => ({ u, hit: u.aliases.find((a) => text.includes(a)) }))
+    .filter((m): m is { u: (typeof umbrellaConcepts)[number]; hit: string } => Boolean(m.hit))
+    .filter((m) => !m.u.facets.some((f) => text.includes(f)));
+
+  // Keep only the most specific umbrella when one matched phrase contains another
+  // (e.g. "mental health" wins over "health").
+  const ambiguousTerms = matchedUmbrellas
+    .filter((m) => !matchedUmbrellas.some((o) => o !== m && o.hit.includes(m.hit)))
+    .map((m) => m.u.term);
+
 
   const sourceTypes = DEFAULT_SOURCE_TYPE_HINTS.filter((s) =>
     s.words.some((w) => text.includes(w)),
