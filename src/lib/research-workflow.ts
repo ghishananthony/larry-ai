@@ -53,6 +53,8 @@ const umbrellaConcepts: { term: string; aliases: string[]; facets: string[] }[] 
     term: "mental health",
     aliases: ["mental health", "psychological health", "mental wellbeing", "mental well-being"],
     facets: ["anxiety", "depression", "self-esteem", "self esteem", "stress", "loneliness", "body image", "sleep"],
+    // "self esteem" is only an alternate spelling used for detection, not a second example.
+
   },
   {
     term: "wellbeing",
@@ -158,14 +160,14 @@ const DEFAULT_SOURCE_TYPE_HINTS: { label: string; words: string[] }[] = [
 /* ------------------------------------------------------------------ */
 
 export type RequestAnalysis = {
-  discipline?: string;
-  population?: string;
+  discipline?: string | undefined;
+  population?: string | undefined;
   concepts: string[];
   /** Umbrella terms the student used without naming a narrower facet. */
   ambiguousTerms: string[];
   sourceTypes: string[];
-  dateRange?: string;
-  sourceCount?: string;
+  dateRange?: string | undefined;
+  sourceCount?: string | undefined;
 };
 
 export function analyzeRequest(goal: string): RequestAnalysis {
@@ -181,10 +183,17 @@ export function analyzeRequest(goal: string): RequestAnalysis {
     new Set(KNOWN_CONCEPTS.filter((c) => text.includes(c.toLowerCase()))),
   );
 
-  const ambiguousTerms = umbrellaConcepts
-    .filter((u) => u.aliases.some((a) => text.includes(a)))
-    .filter((u) => !u.facets.some((f) => text.includes(f)))
-    .map((u) => u.term);
+  const matchedUmbrellas = umbrellaConcepts
+    .map((u) => ({ u, hit: u.aliases.find((a) => text.includes(a)) }))
+    .filter((m): m is { u: (typeof umbrellaConcepts)[number]; hit: string } => Boolean(m.hit))
+    .filter((m) => !m.u.facets.some((f) => text.includes(f)));
+
+  // Keep only the most specific umbrella when one matched phrase contains another
+  // (e.g. "mental health" wins over "health").
+  const ambiguousTerms = matchedUmbrellas
+    .filter((m) => !matchedUmbrellas.some((o) => o !== m && o.hit.includes(m.hit)))
+    .map((m) => m.u.term);
+
 
   const sourceTypes = DEFAULT_SOURCE_TYPE_HINTS.filter((s) =>
     s.words.some((w) => text.includes(w)),
@@ -205,7 +214,19 @@ export function analyzeRequest(goal: string): RequestAnalysis {
 }
 
 /** Clarification questions Larry must ask before building a profile. */
+/** Collapse alternate spellings ("self-esteem" / "self esteem") in example lists. */
+function dedupeExamples(list: string[]): string[] {
+  const seen = new Set<string>();
+  return list.filter((item) => {
+    const key = item.toLowerCase().replace(/[^a-z]/g, "");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export function buildClarifications(analysis: RequestAnalysis): ClarificationQuestion[] {
+
   const questions: ClarificationQuestion[] = [];
 
   for (const term of analysis.ambiguousTerms) {
@@ -213,7 +234,7 @@ export function buildClarifications(analysis: RequestAnalysis): ClarificationQue
     questions.push({
       id: `ambiguity:${term}`,
       question: `You mentioned “${term}”, which covers a wide range of research. What specific aspect of ${term} are you focusing on?`,
-      examples: entry.facets.slice(0, 5),
+      examples: dedupeExamples(entry.facets).slice(0, 5),
       helper:
         "These are examples only — Larry will not choose for you. Answer in your own words, using your own research focus.",
     });
