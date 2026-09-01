@@ -222,7 +222,7 @@ export function buildClarifications(analysis: RequestAnalysis): ClarificationQue
     questions.push({
       id: `ambiguity:${term}`,
       question: `You mentioned “${term}”, which covers a wide range of research. What specific aspect of ${term} are you focusing on?`,
-      examples: entry.facets.slice(0, 5),
+      examples: dedupeExamples(entry.facets).slice(0, 5),
       helper:
         "These are examples only — Larry will not choose for you. Answer in your own words, using your own research focus.",
     });
