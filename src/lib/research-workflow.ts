@@ -214,7 +214,19 @@ export function analyzeRequest(goal: string): RequestAnalysis {
 }
 
 /** Clarification questions Larry must ask before building a profile. */
+/** Collapse alternate spellings ("self-esteem" / "self esteem") in example lists. */
+function dedupeExamples(list: string[]): string[] {
+  const seen = new Set<string>();
+  return list.filter((item) => {
+    const key = item.toLowerCase().replace(/[^a-z]/g, "");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export function buildClarifications(analysis: RequestAnalysis): ClarificationQuestion[] {
+
   const questions: ClarificationQuestion[] = [];
 
   for (const term of analysis.ambiguousTerms) {
