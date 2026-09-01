@@ -160,14 +160,14 @@ const DEFAULT_SOURCE_TYPE_HINTS: { label: string; words: string[] }[] = [
 /* ------------------------------------------------------------------ */
 
 export type RequestAnalysis = {
-  discipline?: string;
-  population?: string;
+  discipline?: string | undefined;
+  population?: string | undefined;
   concepts: string[];
   /** Umbrella terms the student used without naming a narrower facet. */
   ambiguousTerms: string[];
   sourceTypes: string[];
-  dateRange?: string;
-  sourceCount?: string;
+  dateRange?: string | undefined;
+  sourceCount?: string | undefined;
 };
 
 export function analyzeRequest(goal: string): RequestAnalysis {
