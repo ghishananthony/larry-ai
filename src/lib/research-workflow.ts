@@ -280,21 +280,122 @@ export type ProfileInput = {
   answers: Record<string, string>;
 };
 
+/** Normalize a phrase for comparison: lowercase, punctuation → space. */
+function normalizeTerm(term: string): string {
+  return term.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+/**
+ * Map a phrase to a canonical concept label so that alternate spellings
+ * ("self esteem" / "self-esteem") never enter the query twice.
+ */
+function canonicalConcept(term: string): string {
+  const norm = normalizeTerm(term);
+  for (const key of Object.keys(conceptSynonyms)) {
+    if (normalizeTerm(key) === norm) return key;
+    if (conceptSynonyms[key]!.some((s) => normalizeTerm(s) === norm)) return key;
+  }
+  const known = KNOWN_CONCEPTS.find((c) => normalizeTerm(c) === norm);
+  if (known) {
+    // Prefer the spelling that has synonym expansion, if one exists.
+    const withSyn = Object.keys(conceptSynonyms).find((k) => normalizeTerm(k) === norm);
+    return withSyn ?? known;
+  }
+  const pop = populationTerms.find(
+    (p) => normalizeTerm(p.label) === norm || p.synonyms.some((s) => normalizeTerm(s) === norm),
+  );
+  if (pop) return pop.label;
+  return term.trim();
+}
+
+/** Conversational scaffolding that is never a research concept. */
+const CONVERSATIONAL_PATTERNS: RegExp[] = [
+  /^\s*(well|so|ok|okay|yeah|yes|hi|hello)\b[,:\s]*/i,
+  /\b(i\s*(?:'|’)?\s*m|i\s+am|we\s+are|we\s*(?:'|’)?\s*re)\s+(focusing|focused|looking|interested|researching|studying|examining|exploring|investigating|writing|working)\s*(on|at|in|about|into)?\b/gi,
+  /\b(i|we)\s+(want|would\s+like|plan|intend|need|hope)\s+to\s+(look|focus|research|study|examine|explore|investigate|write)\s*(at|on|about|into)?\b/gi,
+  /\b(my|the)\s+(paper|topic|focus|research|study|assignment)\s+(is|will\s+be)\s*(on|about)?\b/gi,
+  /\b(i|we)\s*(?:'|’)?\s*(m|re)?\s*(just\s+)?(going\s+to|gonna)\s+\w+\b/gi,
+  /\b(specifically|particularly|mainly|mostly|basically|really|kind\s+of|sort\s+of|in\s+particular|for\s+now|i\s+think|i\s+guess)\b/gi,
+  /\b(please|thanks|thank\s+you)\b/gi,
+];
+
+const CONCEPT_STOPWORDS = new Set([
+  "the", "a", "an", "of", "on", "in", "at", "for", "to", "and", "or", "with",
+  "about", "into", "how", "does", "do", "affects", "affect", "affecting",
+  "effects", "effect", "its", "it", "is", "are", "their", "them", "that",
+  "this", "these", "those", "my", "our", "topic", "paper", "research",
+  "study", "focus", "aspect", "part", "specific", "among", "between",
+  "impact", "influence", "relationship", "levels", "level",
+]);
+
+/**
+ * Interpret a free-text clarification answer and return the research concepts
+ * it names. The sentence itself is NEVER treated as a search term.
+ */
+export function extractConcepts(answer: string): string[] {
+  let text = ` ${answer.toLowerCase()} `;
+  for (const pattern of CONVERSATIONAL_PATTERNS) text = text.replace(pattern, " ");
+  text = text.replace(/[^a-z0-9\-\s]/g, " ").replace(/\s+/g, " ").trim();
+  if (!text) return [];
+
+  const found: string[] = [];
+  const consume = (phrase: string) => {
+    const norm = normalizeTerm(phrase);
+    if (!norm) return;
+    const re = new RegExp(`\\b${norm.split(" ").join("[\\s-]+")}\\b`, "g");
+    if (re.test(text)) {
+      found.push(canonicalConcept(phrase));
+      text = text.replace(re, " ");
+    }
+  };
+
+  // Longest phrases first so "body image" beats "image".
+  const vocabulary = [
+    ...KNOWN_CONCEPTS,
+    ...populationTerms.flatMap((p) => [p.label, ...p.synonyms, ...p.words]),
+  ]
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length);
+
+  for (const term of vocabulary) consume(term);
+
+  if (found.length === 0) {
+    // No known vocabulary matched: keep the remaining content words only,
+    // so conversational scaffolding still never reaches the query.
+    const words = text.split(" ").filter((w) => w && !CONCEPT_STOPWORDS.has(w));
+    if (words.length > 0 && words.length <= 4) found.push(canonicalConcept(words.join(" ")));
+  }
+
+  return Array.from(new Set(found.map(canonicalConcept)));
+}
+
+function dedupeConcepts(list: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of list) {
+    const concept = canonicalConcept(raw);
+    const key = normalizeTerm(concept);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(concept);
+  }
+  return out;
+}
+
 export function buildProfile(input: ProfileInput): ResearchProfile {
   const combined = `${input.goal} ${Object.values(input.answers).join(" ")}`;
   const analysis = analyzeRequest(combined);
 
   const answerFor = (id: string) => input.answers[id]?.trim();
 
-  const clarifiedConcepts = Array.from(
-    new Set([
-      ...analysis.concepts,
-      ...Object.entries(input.answers)
-        .filter(([id]) => id.startsWith("ambiguity:"))
-        .map(([, v]) => v.trim())
-        .filter(Boolean),
-    ]),
-  );
+  const clarifiedConcepts = dedupeConcepts([
+    ...analysis.concepts,
+    ...Object.entries(input.answers)
+      .filter(([id]) => id.startsWith("ambiguity:"))
+      .flatMap(([, v]) => extractConcepts(v)),
+  ]);
+
 
   const sourceTypes = Array.from(
     new Set([...input.selectedSourceTypes, ...analysis.sourceTypes]),
@@ -332,22 +433,26 @@ export type SearchTerms = {
 };
 
 function expand(concept: string): string[] {
-  const key = concept.toLowerCase().trim();
+  const canonical = canonicalConcept(concept);
+  const key = canonical.toLowerCase().trim();
   if (conceptSynonyms[key]) return conceptSynonyms[key]!;
-  const pop = populationTerms.find((p) => p.label === concept || p.synonyms.includes(key));
+  const pop = populationTerms.find((p) => p.label === canonical || p.synonyms.includes(key));
   if (pop) return pop.synonyms;
-  return [concept];
+  return [canonical];
 }
 
 export function generateSearchTerms(profile: ResearchProfile): SearchTerms {
   const concepts = [...profile.concepts];
   if (profile.population.origin === "student" && !/no specific/i.test(profile.population.value)) {
-    concepts.push(profile.population.value);
+    // The population answer is natural language too — interpret it, never
+    // send the sentence itself to the database.
+    concepts.push(...extractConcepts(profile.population.value));
   }
 
-  const groups = concepts
+  const groups = dedupeConcepts(concepts)
     .filter(Boolean)
     .map((concept) => ({ concept, terms: expand(concept) }));
+
 
   const query = groups
     .map((g) => `(${g.terms.map((t) => (t.includes(" ") ? `"${t}"` : t)).join(" OR ")})`)
