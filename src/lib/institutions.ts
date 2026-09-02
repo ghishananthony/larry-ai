@@ -27,11 +27,11 @@ export type Institution = {
 
 export const institutions: Institution[] = [
   {
-    slug: "st-jude",
-    name: "University of St. Jude",
-    shortName: "St. Jude",
-    catalogName: "St. Jude Main Library Catalog",
-    proxyPrefix: "https://ezproxy.stjude.edu/login?url=",
+    slug: "menlo-college",
+    name: "Menlo College",
+    shortName: "Menlo",
+    catalogName: "Menlo College Library Catalog",
+    proxyPrefix: "https://ezproxy.menlo.edu/login?url=",
     resources: [
       {
         id: "jstor",
@@ -89,7 +89,7 @@ export const institutions: Institution[] = [
       },
       {
         id: "catalog",
-        name: "St. Jude Main Library Catalog",
+        name: "Menlo College Library Catalog",
         provider: "Ex Libris Alma",
         kind: "catalog",
         disciplines: ["psychology", "history", "marine biology", "sociology", "media"],
@@ -98,7 +98,7 @@ export const institutions: Institution[] = [
         status: "active",
         auth: "Shibboleth SSO",
         monthlyQueries: 20144,
-        url: "https://catalog.stjude.edu/discovery/search?query=any,contains,",
+        url: "https://catalog.menlo.edu/discovery/search?query=any,contains,",
       },
       {
         id: "westlaw",

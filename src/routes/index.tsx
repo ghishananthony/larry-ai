@@ -63,7 +63,7 @@ function Index() {
               <div className="flex items-center gap-3">
                 <div className="size-6 bg-accent rounded-full" />
                 <span className="text-primary-foreground font-medium text-sm">
-                  Larry @ University of St. Jude
+                  Larry @ Menlo College
                 </span>
               </div>
               <div className="size-2 bg-success rounded-full animate-pulse" />
