@@ -433,22 +433,26 @@ export type SearchTerms = {
 };
 
 function expand(concept: string): string[] {
-  const key = concept.toLowerCase().trim();
+  const canonical = canonicalConcept(concept);
+  const key = canonical.toLowerCase().trim();
   if (conceptSynonyms[key]) return conceptSynonyms[key]!;
-  const pop = populationTerms.find((p) => p.label === concept || p.synonyms.includes(key));
+  const pop = populationTerms.find((p) => p.label === canonical || p.synonyms.includes(key));
   if (pop) return pop.synonyms;
-  return [concept];
+  return [canonical];
 }
 
 export function generateSearchTerms(profile: ResearchProfile): SearchTerms {
   const concepts = [...profile.concepts];
   if (profile.population.origin === "student" && !/no specific/i.test(profile.population.value)) {
-    concepts.push(profile.population.value);
+    // The population answer is natural language too — interpret it, never
+    // send the sentence itself to the database.
+    concepts.push(...extractConcepts(profile.population.value));
   }
 
-  const groups = concepts
+  const groups = dedupeConcepts(concepts)
     .filter(Boolean)
     .map((concept) => ({ concept, terms: expand(concept) }));
+
 
   const query = groups
     .map((g) => `(${g.terms.map((t) => (t.includes(" ") ? `"${t}"` : t)).join(" OR ")})`)
