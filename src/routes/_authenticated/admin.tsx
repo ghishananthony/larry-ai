@@ -1,9 +1,24 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { SiteFooter, SiteNav } from "@/components/SiteNav";
-import { getInstitution, institutions, type ResourceStatus } from "@/lib/institutions";
+import { supabase } from "@/integrations/supabase/client";
+import { useInstitutionAccess } from "@/hooks/useInstitutionAccess";
+import { getInstitution, type ResourceStatus } from "@/lib/institutions";
 
 export const Route = createFileRoute("/_authenticated/admin")({
+  beforeLoad: async () => {
+    // Authorization is enforced in the database (RLS); this only avoids
+    // rendering an empty console to someone who has no admin grant.
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) throw redirect({ to: "/auth" });
+    const { data: roles } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userData.user.id);
+    const allowed = (roles ?? []).some(
+      (r) => r.role === "college_admin" || r.role === "super_admin",
+    );
+    if (!allowed) throw redirect({ to: "/profile" });
+  },
   head: () => ({
     meta: [
       { title: "Admin Console — Larry for Libraries" },
