@@ -65,6 +65,8 @@ function Label({ children }: { children: React.ReactNode }) {
 }
 
 function WidgetPage() {
+  const { session } = useAuth();
+  const access = useInstitutionAccess();
   const [slug, setSlug] = useState(institutions[0]!.slug);
   const [goal, setGoal] = useState("");
   const [types, setTypes] = useState<string[]>(["Peer-reviewed articles"]);
@@ -78,7 +80,11 @@ function WidgetPage() {
   const [execution, setExecution] = useState<SearchExecution | null>(null);
   const [broadenAcknowledged, setBroadenAcknowledged] = useState(false);
 
-  const institution = getInstitution(slug);
+  // A signed-in student is always pinned to the institution recorded on their
+  // profile in the database; the selector is only a demo affordance for visitors.
+  const enrolledSlug = access.data?.slug ?? null;
+  const activeSlug = session ? (enrolledSlug ?? institutions[0]!.slug) : slug;
+  const institution = getInstitution(activeSlug);
 
   const reset = () => {
     setStage("request");
