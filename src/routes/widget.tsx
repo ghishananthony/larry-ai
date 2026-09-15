@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { SiteFooter, SiteNav } from "@/components/SiteNav";
+import { useAuth } from "@/hooks/useAuth";
+import { useInstitutionAccess } from "@/hooks/useInstitutionAccess";
 import { getInstitution, institutions } from "@/lib/institutions";
 import {
   analyzeRequest,
