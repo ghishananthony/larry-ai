@@ -53,13 +53,6 @@ export type Database = {
             foreignKeyName: "admin_access_requests_institution_id_fkey"
             columns: ["institution_id"]
             isOneToOne: false
-            referencedRelation: "institution_directory"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "admin_access_requests_institution_id_fkey"
-            columns: ["institution_id"]
-            isOneToOne: false
             referencedRelation: "institutions"
             referencedColumns: ["id"]
           },
@@ -91,13 +84,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "institution_settings_institution_id_fkey"
-            columns: ["institution_id"]
-            isOneToOne: true
-            referencedRelation: "institution_directory"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "institution_settings_institution_id_fkey"
             columns: ["institution_id"]
@@ -239,13 +225,6 @@ export type Database = {
             foreignKeyName: "profiles_institution_id_fkey"
             columns: ["institution_id"]
             isOneToOne: false
-            referencedRelation: "institution_directory"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "profiles_institution_id_fkey"
-            columns: ["institution_id"]
-            isOneToOne: false
             referencedRelation: "institutions"
             referencedColumns: ["id"]
           },
@@ -305,13 +284,6 @@ export type Database = {
             foreignKeyName: "resources_institution_id_fkey"
             columns: ["institution_id"]
             isOneToOne: false
-            referencedRelation: "institution_directory"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "resources_institution_id_fkey"
-            columns: ["institution_id"]
-            isOneToOne: false
             referencedRelation: "institutions"
             referencedColumns: ["id"]
           },
@@ -343,13 +315,6 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "usage_events_institution_id_fkey"
-            columns: ["institution_id"]
-            isOneToOne: false
-            referencedRelation: "institution_directory"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "usage_events_institution_id_fkey"
             columns: ["institution_id"]
@@ -393,13 +358,6 @@ export type Database = {
             foreignKeyName: "user_roles_institution_id_fkey"
             columns: ["institution_id"]
             isOneToOne: false
-            referencedRelation: "institution_directory"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_roles_institution_id_fkey"
-            columns: ["institution_id"]
-            isOneToOne: false
             referencedRelation: "institutions"
             referencedColumns: ["id"]
           },
@@ -407,30 +365,7 @@ export type Database = {
       }
     }
     Views: {
-      institution_directory: {
-        Row: {
-          catalog_name: string | null
-          id: string | null
-          name: string | null
-          short_name: string | null
-          slug: string | null
-        }
-        Insert: {
-          catalog_name?: string | null
-          id?: string | null
-          name?: string | null
-          short_name?: string | null
-          slug?: string | null
-        }
-        Update: {
-          catalog_name?: string | null
-          id?: string | null
-          name?: string | null
-          short_name?: string | null
-          slug?: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       claim_institution_access: {
