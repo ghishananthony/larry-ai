@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/useAuth";
+import { useInstitutionAccess } from "@/hooks/useInstitutionAccess";
 
 export function LarryMark({ size = "md" }: { size?: "sm" | "md" }) {
   const box = size === "sm" ? "size-6" : "size-8";
