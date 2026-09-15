@@ -159,23 +159,27 @@ function WidgetPage() {
               You choose what to research. Larry finds where to look.
             </h1>
           </div>
-          <label className="text-sm">
+          <div className="text-sm">
             <Label>Your institution</Label>
-            <select
-              value={slug}
-              onChange={(e) => {
-                setSlug(e.target.value);
-                reset();
-              }}
-              className="bg-card border border-input rounded-lg px-3 py-2 text-sm"
-            >
-              {institutions.map((i) => (
-                <option key={i.slug} value={i.slug}>
-                  {i.name}
-                </option>
-              ))}
-            </select>
-          </label>
+            {session ? (
+              <p className="px-3 py-2 text-sm">{institution.name}</p>
+            ) : (
+              <select
+                value={slug}
+                onChange={(e) => {
+                  setSlug(e.target.value);
+                  reset();
+                }}
+                className="bg-card border border-input rounded-lg px-3 py-2 text-sm"
+              >
+                {institutions.map((i) => (
+                  <option key={i.slug} value={i.slug}>
+                    {i.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
         </div>
 
         <ol className="flex flex-wrap gap-2 mb-6">
