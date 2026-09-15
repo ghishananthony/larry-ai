@@ -3,7 +3,7 @@ import { useState } from "react";
 import { SiteFooter, SiteNav } from "@/components/SiteNav";
 import { getInstitution, institutions, type ResourceStatus } from "@/lib/institutions";
 
-export const Route = createFileRoute("/admin")({
+export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({
     meta: [
       { title: "Admin Console — Larry for Libraries" },
