@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { SiteFooter, SiteNav } from "@/components/SiteNav";
+import { useAuth } from "@/hooks/useAuth";
+import { useInstitutionAccess } from "@/hooks/useInstitutionAccess";
 import { getInstitution, institutions } from "@/lib/institutions";
 import {
   analyzeRequest,
@@ -63,6 +65,8 @@ function Label({ children }: { children: React.ReactNode }) {
 }
 
 function WidgetPage() {
+  const { session } = useAuth();
+  const access = useInstitutionAccess();
   const [slug, setSlug] = useState(institutions[0]!.slug);
   const [goal, setGoal] = useState("");
   const [types, setTypes] = useState<string[]>(["Peer-reviewed articles"]);
@@ -76,7 +80,11 @@ function WidgetPage() {
   const [execution, setExecution] = useState<SearchExecution | null>(null);
   const [broadenAcknowledged, setBroadenAcknowledged] = useState(false);
 
-  const institution = getInstitution(slug);
+  // A signed-in student is always pinned to the institution recorded on their
+  // profile in the database; the selector is only a demo affordance for visitors.
+  const enrolledSlug = access.data?.slug ?? null;
+  const activeSlug = session ? (enrolledSlug ?? institutions[0]!.slug) : slug;
+  const institution = getInstitution(activeSlug);
 
   const reset = () => {
     setStage("request");
@@ -151,23 +159,27 @@ function WidgetPage() {
               You choose what to research. Larry finds where to look.
             </h1>
           </div>
-          <label className="text-sm">
+          <div className="text-sm">
             <Label>Your institution</Label>
-            <select
-              value={slug}
-              onChange={(e) => {
-                setSlug(e.target.value);
-                reset();
-              }}
-              className="bg-card border border-input rounded-lg px-3 py-2 text-sm"
-            >
-              {institutions.map((i) => (
-                <option key={i.slug} value={i.slug}>
-                  {i.name}
-                </option>
-              ))}
-            </select>
-          </label>
+            {session ? (
+              <p className="px-3 py-2 text-sm">{institution.name}</p>
+            ) : (
+              <select
+                value={slug}
+                onChange={(e) => {
+                  setSlug(e.target.value);
+                  reset();
+                }}
+                className="bg-card border border-input rounded-lg px-3 py-2 text-sm"
+              >
+                {institutions.map((i) => (
+                  <option key={i.slug} value={i.slug}>
+                    {i.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
         </div>
 
         <ol className="flex flex-wrap gap-2 mb-6">

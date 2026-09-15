@@ -1,0 +1,1 @@
+revoke execute on function public.claim_institution_access(uuid) from anon, authenticated, public;

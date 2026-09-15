@@ -1,9 +1,24 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { SiteFooter, SiteNav } from "@/components/SiteNav";
-import { getInstitution, institutions, type ResourceStatus } from "@/lib/institutions";
+import { supabase } from "@/integrations/supabase/client";
+import { useInstitutionAccess } from "@/hooks/useInstitutionAccess";
+import { getInstitution, type ResourceStatus } from "@/lib/institutions";
 
-export const Route = createFileRoute("/admin")({
+export const Route = createFileRoute("/_authenticated/admin")({
+  beforeLoad: async () => {
+    // Authorization is enforced in the database (RLS); this only avoids
+    // rendering an empty console to someone who has no admin grant.
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) throw redirect({ to: "/auth" });
+    const { data: roles } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userData.user.id);
+    const allowed = (roles ?? []).some(
+      (r) => r.role === "college_admin" || r.role === "super_admin",
+    );
+    if (!allowed) throw redirect({ to: "/profile" });
+  },
   head: () => ({
     meta: [
       { title: "Admin Console — Larry for Libraries" },
@@ -40,8 +55,10 @@ const statusDot: Record<ResourceStatus, string> = {
 };
 
 function AdminPage() {
-  const [slug, setSlug] = useState(institutions[0]!.slug);
-  const institution = getInstitution(slug);
+  const access = useInstitutionAccess();
+  // The console is always scoped to the institution this admin actually
+  // manages — never to an institution named by the URL or the client.
+  const institution = getInstitution(access.data?.slug ?? "");
   const licensed = institution.resources.filter((r) => r.status === "active" || r.status === "trial");
   const queries = institution.resources.reduce((n, r) => n + r.monthlyQueries, 0);
   const issues = institution.resources.filter((r) => r.status === "auth_error").length;
@@ -56,27 +73,13 @@ function AdminPage() {
             <span className="inline-block px-3 py-1 bg-accent/10 text-accent text-xs font-bold tracking-widest uppercase mb-4">
               Institutional Console
             </span>
-            <h1 className="font-serif text-4xl leading-tight">{institution.name}</h1>
+            <h1 className="font-serif text-4xl leading-tight">
+              {access.data?.name ?? institution.name}
+            </h1>
             <p className="text-sm text-muted-foreground mt-2">
               Proxy prefix <code className="text-xs">{institution.proxyPrefix}</code>
             </p>
           </div>
-          <label className="text-sm">
-            <span className="block text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2">
-              Switch instance
-            </span>
-            <select
-              value={slug}
-              onChange={(e) => setSlug(e.target.value)}
-              className="bg-card border border-input rounded-lg px-3 py-2 text-sm"
-            >
-              {institutions.map((i) => (
-                <option key={i.slug} value={i.slug}>
-                  {i.name}
-                </option>
-              ))}
-            </select>
-          </label>
         </div>
 
         <div className="grid sm:grid-cols-3 gap-6 mb-10">

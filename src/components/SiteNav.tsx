@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/useAuth";
+import { useInstitutionAccess } from "@/hooks/useInstitutionAccess";
 
 export function LarryMark({ size = "md" }: { size?: "sm" | "md" }) {
   const box = size === "sm" ? "size-6" : "size-8";
@@ -17,6 +18,7 @@ export function LarryMark({ size = "md" }: { size?: "sm" | "md" }) {
 
 export function SiteNav() {
   const { session, loading } = useAuth();
+  const access = useInstitutionAccess();
   return (
     <nav className="flex items-center justify-between px-8 py-6 border-b border-border">
       <Link to="/">
@@ -26,9 +28,11 @@ export function SiteNav() {
         <Link to="/widget" className="hover:text-accent transition-colors">
           Student Widget
         </Link>
-        <Link to="/admin" className="hover:text-accent transition-colors">
-          Admin Console
-        </Link>
+        {access.data?.isAdmin && (
+          <Link to="/admin" className="hover:text-accent transition-colors">
+            Admin Console
+          </Link>
+        )}
         <a href="#integrity" className="hover:text-accent transition-colors">
           Integrity Policy
         </a>
