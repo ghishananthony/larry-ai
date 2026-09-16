@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import adminPreview from "@/assets/admin-dashboard-preview.jpg";
 import { SiteFooter, SiteNav } from "@/components/SiteNav";
+import { useInstitutionAccess } from "@/hooks/useInstitutionAccess";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -25,6 +26,7 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
+  const access = useInstitutionAccess();
   return (
     <div className="min-h-screen bg-background font-sans text-foreground">
       <SiteNav />
@@ -48,12 +50,14 @@ function Index() {
             >
               Try the student widget
             </Link>
-            <Link
-              to="/admin"
-              className="border border-input px-8 py-4 rounded-lg font-semibold hover:bg-card transition-colors text-center"
-            >
-              See the admin console
-            </Link>
+            {access.data?.isAdmin && (
+              <Link
+                to="/admin"
+                className="border border-input px-8 py-4 rounded-lg font-semibold hover:bg-card transition-colors text-center"
+              >
+                See the admin console
+              </Link>
+            )}
           </div>
         </div>
 
