@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import adminPreview from "@/assets/admin-dashboard-preview.jpg";
 import { SiteFooter, SiteNav } from "@/components/SiteNav";
+import { useInstitutionAccess } from "@/hooks/useInstitutionAccess";
 
 export const Route = createFileRoute("/")({
   head: () => ({
