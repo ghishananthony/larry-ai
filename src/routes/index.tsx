@@ -26,6 +26,7 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
+  const access = useInstitutionAccess();
   return (
     <div className="min-h-screen bg-background font-sans text-foreground">
       <SiteNav />
