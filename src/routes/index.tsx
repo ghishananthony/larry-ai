@@ -50,12 +50,14 @@ function Index() {
             >
               Try the student widget
             </Link>
-            <Link
-              to="/admin"
-              className="border border-input px-8 py-4 rounded-lg font-semibold hover:bg-card transition-colors text-center"
-            >
-              See the admin console
-            </Link>
+            {access.data?.isAdmin && (
+              <Link
+                to="/admin"
+                className="border border-input px-8 py-4 rounded-lg font-semibold hover:bg-card transition-colors text-center"
+              >
+                See the admin console
+              </Link>
+            )}
           </div>
         </div>
 
