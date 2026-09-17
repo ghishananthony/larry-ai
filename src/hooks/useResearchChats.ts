@@ -65,8 +65,8 @@ export function useSaveResearchChat() {
         source_types: snapshot.sourceTypes,
         stage: snapshot.stage,
         answers: snapshot.answers,
-        profile: snapshot.profile ?? null,
-        terms: snapshot.terms ?? null,
+        profile: (snapshot.profile ?? null) as never,
+        terms: (snapshot.terms ?? null) as never,
       };
 
       if (snapshot.id) {
