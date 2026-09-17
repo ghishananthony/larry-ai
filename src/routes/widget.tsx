@@ -652,7 +652,33 @@ function WidgetPage() {
             )}
           </div>
         </div>
+        </div>
       </main>
+
+      {!session && !guestPromptDismissed && (
+        <div className="fixed bottom-6 right-6 z-40 w-[min(22rem,calc(100vw-3rem))] bg-card border border-border rounded-2xl shadow-panel p-5">
+          <p className="text-[10px] uppercase tracking-wider font-bold mb-2">Save your research</p>
+          <p className="text-sm text-muted-foreground">
+            Create a free student account to save your research chats. Larry works the same either
+            way — guest sessions simply aren't saved.
+          </p>
+          <div className="flex gap-2 mt-4">
+            <Link
+              to="/auth"
+              className="flex-1 text-center bg-primary text-primary-foreground px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider"
+            >
+              Create an account
+            </Link>
+            <button
+              type="button"
+              onClick={() => setGuestPromptDismissed(true)}
+              className="flex-1 border border-input px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-muted-foreground hover:bg-secondary"
+            >
+              Continue as guest
+            </button>
+          </div>
+        </div>
+      )}
 
       <SiteFooter />
     </div>
