@@ -157,6 +157,7 @@ function WidgetPage() {
     const p = buildProfile({ goal, selectedSourceTypes: types, answers: currentAnswers });
     setProfile(p);
     setStage("profile");
+    persist({ stage: "profile", profile: p, terms: null, answers: currentAnswers });
   };
 
   const submitAnswers = () => {
