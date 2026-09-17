@@ -86,6 +86,36 @@ function WidgetPage() {
   const [execution, setExecution] = useState<SearchExecution | null>(null);
   const [broadenAcknowledged, setBroadenAcknowledged] = useState(false);
 
+  const [chatId, setChatId] = useState<string | null>(null);
+  const [guestPromptDismissed, setGuestPromptDismissed] = useState(false);
+  const chats = useResearchChats();
+  const saveChat = useSaveResearchChat();
+  const deleteChat = useDeleteResearchChat();
+
+  /** Chats are only ever persisted for a signed-in student. Guests are never saved. */
+  const persist = (next: {
+    stage: Stage;
+    profile: ResearchProfile | null;
+    terms: SearchTerms | null;
+    answers: Record<string, string>;
+  }) => {
+    if (!session) return;
+    saveChat.mutate(
+      {
+        id: chatId,
+        title: goal.trim().slice(0, 120) || "New research chat",
+        goal,
+        sourceTypes: types,
+        stage: next.stage,
+        answers: next.answers,
+        profile: next.profile,
+        terms: next.terms,
+      },
+      { onSuccess: (id) => id && setChatId(id) },
+    );
+  };
+
+
   // A signed-in student is always pinned to the institution recorded on their
   // profile in the database; the selector is only a demo affordance for visitors.
   const enrolledSlug = access.data?.slug ?? null;
