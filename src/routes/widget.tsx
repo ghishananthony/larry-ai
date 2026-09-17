@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { X } from "lucide-react";
 import { SiteFooter, SiteNav } from "@/components/SiteNav";
 import { useAuth } from "@/hooks/useAuth";
 import { useInstitutionAccess } from "@/hooks/useInstitutionAccess";
