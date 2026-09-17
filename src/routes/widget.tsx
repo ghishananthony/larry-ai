@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { X } from "lucide-react";
 import { SiteFooter, SiteNav } from "@/components/SiteNav";
 import { useAuth } from "@/hooks/useAuth";
 import { useInstitutionAccess } from "@/hooks/useInstitutionAccess";
@@ -657,7 +658,17 @@ function WidgetPage() {
 
       {!session && !guestPromptDismissed && (
         <div className="fixed bottom-6 right-6 z-40 w-[min(22rem,calc(100vw-3rem))] bg-card border border-border rounded-2xl shadow-panel p-5">
-          <p className="text-[10px] uppercase tracking-wider font-bold mb-2">Save your research</p>
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-[10px] uppercase tracking-wider font-bold mb-2">Save your research</p>
+            <button
+              type="button"
+              onClick={() => setGuestPromptDismissed(true)}
+              aria-label="Dismiss"
+              className="-mt-1 -mr-1 p-1 rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
           <p className="text-sm text-muted-foreground">
             Create a free student account to save your research chats. Larry works the same either
             way — guest sessions simply aren't saved.
