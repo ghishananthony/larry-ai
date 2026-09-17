@@ -277,7 +277,56 @@ function WidgetPage() {
           })}
         </ol>
 
-        <div className="bg-card rounded-2xl shadow-panel border border-border overflow-hidden grid lg:grid-cols-12">
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
+        {session && (
+          <aside className="w-full lg:w-64 shrink-0 bg-card rounded-2xl border border-border shadow-panel p-5">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[10px] uppercase tracking-wider font-bold">Previous chats</p>
+            </div>
+            <button
+              type="button"
+              onClick={newChat}
+              className="w-full bg-primary text-primary-foreground py-2 rounded-lg text-xs font-bold uppercase tracking-wider mb-4"
+            >
+              New research chat
+            </button>
+            {chats.isLoading && <p className="text-xs text-muted-foreground">Loading…</p>}
+            {!chats.isLoading && (chats.data?.length ?? 0) === 0 && (
+              <p className="text-xs text-muted-foreground">
+                Your saved research chats will appear here.
+              </p>
+            )}
+            <ul className="space-y-1">
+              {(chats.data ?? []).map((row) => (
+                <li key={row.id} className="group flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => openChat(row)}
+                    className={`flex-1 text-left px-3 py-2 rounded-lg text-xs truncate hover:bg-secondary ${
+                      chatId === row.id ? "bg-secondary font-semibold" : "text-muted-foreground"
+                    }`}
+                    title={row.title}
+                  >
+                    {row.title}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      deleteChat.mutate(row.id);
+                      if (chatId === row.id) newChat();
+                    }}
+                    aria-label={`Delete ${row.title}`}
+                    className="opacity-0 group-hover:opacity-100 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </aside>
+        )}
+
+        <div className="flex-1 min-w-0 bg-card rounded-2xl shadow-panel border border-border overflow-hidden grid lg:grid-cols-12">
           {/* ---------------- Left: student input ---------------- */}
           <div className="lg:col-span-5 p-8 bg-background border-b lg:border-b-0 lg:border-r border-border">
             <Label>Your research goal, in your own words</Label>
