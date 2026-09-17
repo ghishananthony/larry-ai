@@ -1,8 +1,14 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { SiteFooter, SiteNav } from "@/components/SiteNav";
 import { useAuth } from "@/hooks/useAuth";
 import { useInstitutionAccess } from "@/hooks/useInstitutionAccess";
+import {
+  useDeleteResearchChat,
+  useResearchChats,
+  useSaveResearchChat,
+  type ResearchChatRow,
+} from "@/hooks/useResearchChats";
 import { getInstitution, institutions } from "@/lib/institutions";
 import {
   analyzeRequest,
@@ -80,6 +86,36 @@ function WidgetPage() {
   const [execution, setExecution] = useState<SearchExecution | null>(null);
   const [broadenAcknowledged, setBroadenAcknowledged] = useState(false);
 
+  const [chatId, setChatId] = useState<string | null>(null);
+  const [guestPromptDismissed, setGuestPromptDismissed] = useState(false);
+  const chats = useResearchChats();
+  const saveChat = useSaveResearchChat();
+  const deleteChat = useDeleteResearchChat();
+
+  /** Chats are only ever persisted for a signed-in student. Guests are never saved. */
+  const persist = (next: {
+    stage: Stage;
+    profile: ResearchProfile | null;
+    terms: SearchTerms | null;
+    answers: Record<string, string>;
+  }) => {
+    if (!session) return;
+    saveChat.mutate(
+      {
+        id: chatId,
+        title: goal.trim().slice(0, 120) || "New research chat",
+        goal,
+        sourceTypes: types,
+        stage: next.stage,
+        answers: next.answers,
+        profile: next.profile,
+        terms: next.terms,
+      },
+      { onSuccess: (id) => id && setChatId(id) },
+    );
+  };
+
+
   // A signed-in student is always pinned to the institution recorded on their
   // profile in the database; the selector is only a demo affordance for visitors.
   const enrolledSlug = access.data?.slug ?? null;
@@ -121,6 +157,7 @@ function WidgetPage() {
     const p = buildProfile({ goal, selectedSourceTypes: types, answers: currentAnswers });
     setProfile(p);
     setStage("profile");
+    persist({ stage: "profile", profile: p, terms: null, answers: currentAnswers });
   };
 
   const submitAnswers = () => {
@@ -138,6 +175,43 @@ function WidgetPage() {
     setChoices(c);
     setExecution(c[0] ? executeSearch(institution, c[0], t) : null);
     setStage("search");
+    persist({ stage: "search", profile, terms: t, answers });
+  };
+
+  /** Start a brand-new research chat (signed-in students get a new saved record). */
+  const newChat = () => {
+    setChatId(null);
+    setGoal("");
+    setTypes(["Peer-reviewed articles"]);
+    reset();
+  };
+
+  /** Restore a previously saved chat. No workflow step is skipped or auto-run. */
+  const openChat = (row: ResearchChatRow) => {
+    setChatId(row.id);
+    setGoal(row.goal);
+    setTypes(row.source_types ?? []);
+    setAnswers(row.answers ?? {});
+    setQuestions([]);
+    setChoices([]);
+    setExecution(null);
+    setBroadenAcknowledged(false);
+
+    const savedProfile = (row.profile as ResearchProfile | null) ?? null;
+    const savedTerms = (row.terms as SearchTerms | null) ?? null;
+    setProfile(savedProfile);
+    setTerms(savedTerms);
+
+    if (row.stage === "search" && savedProfile && savedTerms) {
+      const c = selectResources(getInstitution(activeSlug), savedProfile);
+      setChoices(c);
+      setExecution(c[0] ? executeSearch(getInstitution(activeSlug), c[0], savedTerms) : null);
+      setStage("search");
+    } else if (savedProfile) {
+      setStage("profile");
+    } else {
+      setStage("request");
+    }
   };
 
   const runWith = (choice: ResourceChoice) => {
@@ -203,7 +277,56 @@ function WidgetPage() {
           })}
         </ol>
 
-        <div className="bg-card rounded-2xl shadow-panel border border-border overflow-hidden grid lg:grid-cols-12">
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
+        {session && (
+          <aside className="w-full lg:w-64 shrink-0 bg-card rounded-2xl border border-border shadow-panel p-5">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[10px] uppercase tracking-wider font-bold">Previous chats</p>
+            </div>
+            <button
+              type="button"
+              onClick={newChat}
+              className="w-full bg-primary text-primary-foreground py-2 rounded-lg text-xs font-bold uppercase tracking-wider mb-4"
+            >
+              New research chat
+            </button>
+            {chats.isLoading && <p className="text-xs text-muted-foreground">Loading…</p>}
+            {!chats.isLoading && (chats.data?.length ?? 0) === 0 && (
+              <p className="text-xs text-muted-foreground">
+                Your saved research chats will appear here.
+              </p>
+            )}
+            <ul className="space-y-1">
+              {(chats.data ?? []).map((row) => (
+                <li key={row.id} className="group flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => openChat(row)}
+                    className={`flex-1 text-left px-3 py-2 rounded-lg text-xs truncate hover:bg-secondary ${
+                      chatId === row.id ? "bg-secondary font-semibold" : "text-muted-foreground"
+                    }`}
+                    title={row.title}
+                  >
+                    {row.title}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      deleteChat.mutate(row.id);
+                      if (chatId === row.id) newChat();
+                    }}
+                    aria-label={`Delete ${row.title}`}
+                    className="opacity-0 group-hover:opacity-100 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </aside>
+        )}
+
+        <div className="flex-1 min-w-0 bg-card rounded-2xl shadow-panel border border-border overflow-hidden grid lg:grid-cols-12">
           {/* ---------------- Left: student input ---------------- */}
           <div className="lg:col-span-5 p-8 bg-background border-b lg:border-b-0 lg:border-r border-border">
             <Label>Your research goal, in your own words</Label>
@@ -529,7 +652,33 @@ function WidgetPage() {
             )}
           </div>
         </div>
+        </div>
       </main>
+
+      {!session && !guestPromptDismissed && (
+        <div className="fixed bottom-6 right-6 z-40 w-[min(22rem,calc(100vw-3rem))] bg-card border border-border rounded-2xl shadow-panel p-5">
+          <p className="text-[10px] uppercase tracking-wider font-bold mb-2">Save your research</p>
+          <p className="text-sm text-muted-foreground">
+            Create a free student account to save your research chats. Larry works the same either
+            way — guest sessions simply aren't saved.
+          </p>
+          <div className="flex gap-2 mt-4">
+            <Link
+              to="/auth"
+              className="flex-1 text-center bg-primary text-primary-foreground px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider"
+            >
+              Create an account
+            </Link>
+            <button
+              type="button"
+              onClick={() => setGuestPromptDismissed(true)}
+              className="flex-1 border border-input px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-muted-foreground hover:bg-secondary"
+            >
+              Continue as guest
+            </button>
+          </div>
+        </div>
+      )}
 
       <SiteFooter />
     </div>
