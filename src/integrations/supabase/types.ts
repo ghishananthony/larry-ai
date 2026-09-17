@@ -230,6 +230,59 @@ export type Database = {
           },
         ]
       }
+      research_chats: {
+        Row: {
+          answers: Json
+          created_at: string
+          goal: string
+          id: string
+          institution_id: string
+          profile: Json | null
+          source_types: string[]
+          stage: string
+          terms: Json | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          answers?: Json
+          created_at?: string
+          goal?: string
+          id?: string
+          institution_id: string
+          profile?: Json | null
+          source_types?: string[]
+          stage?: string
+          terms?: Json | null
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          answers?: Json
+          created_at?: string
+          goal?: string
+          id?: string
+          institution_id?: string
+          profile?: Json | null
+          source_types?: string[]
+          stage?: string
+          terms?: Json | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "research_chats_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       resources: {
         Row: {
           auth_method: string
