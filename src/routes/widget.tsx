@@ -175,6 +175,43 @@ function WidgetPage() {
     setChoices(c);
     setExecution(c[0] ? executeSearch(institution, c[0], t) : null);
     setStage("search");
+    persist({ stage: "search", profile, terms: t, answers });
+  };
+
+  /** Start a brand-new research chat (signed-in students get a new saved record). */
+  const newChat = () => {
+    setChatId(null);
+    setGoal("");
+    setTypes(["Peer-reviewed articles"]);
+    reset();
+  };
+
+  /** Restore a previously saved chat. No workflow step is skipped or auto-run. */
+  const openChat = (row: ResearchChatRow) => {
+    setChatId(row.id);
+    setGoal(row.goal);
+    setTypes(row.source_types ?? []);
+    setAnswers(row.answers ?? {});
+    setQuestions([]);
+    setChoices([]);
+    setExecution(null);
+    setBroadenAcknowledged(false);
+
+    const savedProfile = (row.profile as ResearchProfile | null) ?? null;
+    const savedTerms = (row.terms as SearchTerms | null) ?? null;
+    setProfile(savedProfile);
+    setTerms(savedTerms);
+
+    if (row.stage === "search" && savedProfile && savedTerms) {
+      const c = selectResources(getInstitution(activeSlug), savedProfile);
+      setChoices(c);
+      setExecution(c[0] ? executeSearch(getInstitution(activeSlug), c[0], savedTerms) : null);
+      setStage("search");
+    } else if (savedProfile) {
+      setStage("profile");
+    } else {
+      setStage("request");
+    }
   };
 
   const runWith = (choice: ResourceChoice) => {
