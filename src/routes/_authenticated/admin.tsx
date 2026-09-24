@@ -1,8 +1,52 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { SiteFooter, SiteNav } from "@/components/SiteNav";
 import { supabase } from "@/integrations/supabase/client";
 import { useInstitutionAccess } from "@/hooks/useInstitutionAccess";
-import { getInstitution, type ResourceStatus } from "@/lib/institutions";
+import type { ResourceStatus } from "@/lib/institutions";
+
+type AdminResource = {
+  id: string;
+  name: string;
+  provider: string;
+  kind: string;
+  status: ResourceStatus;
+  auth_method: string;
+  monthly_queries: number;
+};
+
+/**
+ * Reads the institution's configured resources from the database.
+ * RLS guarantees this only returns rows for an institution the
+ * signed-in admin actually manages.
+ */
+function useAdminResources(institutionId: string | null) {
+  return useQuery({
+    queryKey: ["admin-resources", institutionId],
+    enabled: Boolean(institutionId),
+    queryFn: async () => {
+      const [{ data: resources, error }, { data: settings, error: settingsError }] =
+        await Promise.all([
+          supabase
+            .from("resources")
+            .select("id, name, provider, kind, status, auth_method, monthly_queries")
+            .eq("institution_id", institutionId!)
+            .order("name"),
+          supabase
+            .from("institution_settings")
+            .select("proxy_prefix")
+            .eq("institution_id", institutionId!)
+            .maybeSingle(),
+        ]);
+      if (error) throw error;
+      if (settingsError) throw settingsError;
+      return {
+        resources: (resources ?? []) as AdminResource[],
+        proxyPrefix: settings?.proxy_prefix ?? "",
+      };
+    },
+  });
+}
 
 export const Route = createFileRoute("/_authenticated/admin")({
   beforeLoad: async () => {
@@ -58,10 +102,13 @@ function AdminPage() {
   const access = useInstitutionAccess();
   // The console is always scoped to the institution this admin actually
   // manages — never to an institution named by the URL or the client.
-  const institution = getInstitution(access.data?.slug ?? "");
-  const licensed = institution.resources.filter((r) => r.status === "active" || r.status === "trial");
-  const queries = institution.resources.reduce((n, r) => n + r.monthlyQueries, 0);
-  const issues = institution.resources.filter((r) => r.status === "auth_error").length;
+  const institutionId = access.data?.institutionId ?? null;
+  const { data } = useAdminResources(institutionId);
+  const resources = data?.resources ?? [];
+  const proxyPrefix = data?.proxyPrefix ?? "";
+  const licensed = resources.filter((r) => r.status === "active" || r.status === "trial");
+  const queries = resources.reduce((n, r) => n + r.monthly_queries, 0);
+  const issues = resources.filter((r) => r.status === "auth_error").length;
 
   return (
     <div className="min-h-screen bg-background font-sans text-foreground">
@@ -74,10 +121,10 @@ function AdminPage() {
               Institutional Console
             </span>
             <h1 className="font-serif text-4xl leading-tight">
-              {access.data?.name ?? institution.name}
+              {access.data?.name ?? "Institution"}
             </h1>
             <p className="text-sm text-muted-foreground mt-2">
-              Proxy prefix <code className="text-xs">{institution.proxyPrefix}</code>
+              Proxy prefix <code className="text-xs">{proxyPrefix || "Not configured"}</code>
             </p>
           </div>
         </div>
@@ -119,7 +166,7 @@ function AdminPage() {
                 </tr>
               </thead>
               <tbody className="text-sm divide-y divide-border">
-                {institution.resources.map((r) => (
+                {resources.map((r) => (
                   <tr key={r.id} className="hover:bg-secondary/60">
                     <td className="py-4 px-6">
                       <div className="font-medium">{r.name}</div>
@@ -132,10 +179,17 @@ function AdminPage() {
                         {statusLabel[r.status]}
                       </span>
                     </td>
-                    <td className="py-4 px-6 text-muted-foreground">{r.auth}</td>
-                    <td className="py-4 px-6 tabular-nums">{r.monthlyQueries.toLocaleString()}</td>
+                    <td className="py-4 px-6 text-muted-foreground">{r.auth_method}</td>
+                    <td className="py-4 px-6 tabular-nums">{r.monthly_queries.toLocaleString()}</td>
                   </tr>
                 ))}
+                {resources.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="py-8 px-6 text-center text-sm text-muted-foreground">
+                      No resources configured for this institution yet.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -148,7 +202,7 @@ function AdminPage() {
             institution's configured resources only.
           </p>
           <pre className="bg-sidebar-accent border border-sidebar-border rounded-lg p-4 text-xs overflow-x-auto">
-            {`<script src="https://cdn.larry.ai/widget.js" data-instance="${institution.slug}" defer></script>`}
+            {`<script src="https://cdn.larry.ai/widget.js" data-instance="${access.data?.slug ?? ""}" defer></script>`}
           </pre>
         </div>
       </main>
