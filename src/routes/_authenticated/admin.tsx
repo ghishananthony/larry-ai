@@ -102,10 +102,13 @@ function AdminPage() {
   const access = useInstitutionAccess();
   // The console is always scoped to the institution this admin actually
   // manages — never to an institution named by the URL or the client.
-  const institution = getInstitution(access.data?.slug ?? "");
-  const licensed = institution.resources.filter((r) => r.status === "active" || r.status === "trial");
-  const queries = institution.resources.reduce((n, r) => n + r.monthlyQueries, 0);
-  const issues = institution.resources.filter((r) => r.status === "auth_error").length;
+  const institutionId = access.data?.institutionId ?? null;
+  const { data } = useAdminResources(institutionId);
+  const resources = data?.resources ?? [];
+  const proxyPrefix = data?.proxyPrefix ?? "";
+  const licensed = resources.filter((r) => r.status === "active" || r.status === "trial");
+  const queries = resources.reduce((n, r) => n + r.monthly_queries, 0);
+  const issues = resources.filter((r) => r.status === "auth_error").length;
 
   return (
     <div className="min-h-screen bg-background font-sans text-foreground">
