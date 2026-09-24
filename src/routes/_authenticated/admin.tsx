@@ -1,8 +1,52 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { SiteFooter, SiteNav } from "@/components/SiteNav";
 import { supabase } from "@/integrations/supabase/client";
 import { useInstitutionAccess } from "@/hooks/useInstitutionAccess";
-import { getInstitution, type ResourceStatus } from "@/lib/institutions";
+import type { ResourceStatus } from "@/lib/institutions";
+
+type AdminResource = {
+  id: string;
+  name: string;
+  provider: string;
+  kind: string;
+  status: ResourceStatus;
+  auth_method: string;
+  monthly_queries: number;
+};
+
+/**
+ * Reads the institution's configured resources from the database.
+ * RLS guarantees this only returns rows for an institution the
+ * signed-in admin actually manages.
+ */
+function useAdminResources(institutionId: string | null) {
+  return useQuery({
+    queryKey: ["admin-resources", institutionId],
+    enabled: Boolean(institutionId),
+    queryFn: async () => {
+      const [{ data: resources, error }, { data: settings, error: settingsError }] =
+        await Promise.all([
+          supabase
+            .from("resources")
+            .select("id, name, provider, kind, status, auth_method, monthly_queries")
+            .eq("institution_id", institutionId!)
+            .order("name"),
+          supabase
+            .from("institution_settings")
+            .select("proxy_prefix")
+            .eq("institution_id", institutionId!)
+            .maybeSingle(),
+        ]);
+      if (error) throw error;
+      if (settingsError) throw settingsError;
+      return {
+        resources: (resources ?? []) as AdminResource[],
+        proxyPrefix: settings?.proxy_prefix ?? "",
+      };
+    },
+  });
+}
 
 export const Route = createFileRoute("/_authenticated/admin")({
   beforeLoad: async () => {
