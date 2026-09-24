@@ -121,10 +121,10 @@ function AdminPage() {
               Institutional Console
             </span>
             <h1 className="font-serif text-4xl leading-tight">
-              {access.data?.name ?? institution.name}
+              {access.data?.name ?? "Institution"}
             </h1>
             <p className="text-sm text-muted-foreground mt-2">
-              Proxy prefix <code className="text-xs">{institution.proxyPrefix}</code>
+              Proxy prefix <code className="text-xs">{proxyPrefix || "Not configured"}</code>
             </p>
           </div>
         </div>
