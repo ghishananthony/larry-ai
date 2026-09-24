@@ -202,7 +202,7 @@ function AdminPage() {
             institution's configured resources only.
           </p>
           <pre className="bg-sidebar-accent border border-sidebar-border rounded-lg p-4 text-xs overflow-x-auto">
-            {`<script src="https://cdn.larry.ai/widget.js" data-instance="${institution.slug}" defer></script>`}
+            {`<script src="https://cdn.larry.ai/widget.js" data-instance="${access.data?.slug ?? ""}" defer></script>`}
           </pre>
         </div>
       </main>
