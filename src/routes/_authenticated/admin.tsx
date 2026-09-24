@@ -166,7 +166,7 @@ function AdminPage() {
                 </tr>
               </thead>
               <tbody className="text-sm divide-y divide-border">
-                {institution.resources.map((r) => (
+                {resources.map((r) => (
                   <tr key={r.id} className="hover:bg-secondary/60">
                     <td className="py-4 px-6">
                       <div className="font-medium">{r.name}</div>
@@ -179,10 +179,17 @@ function AdminPage() {
                         {statusLabel[r.status]}
                       </span>
                     </td>
-                    <td className="py-4 px-6 text-muted-foreground">{r.auth}</td>
-                    <td className="py-4 px-6 tabular-nums">{r.monthlyQueries.toLocaleString()}</td>
+                    <td className="py-4 px-6 text-muted-foreground">{r.auth_method}</td>
+                    <td className="py-4 px-6 tabular-nums">{r.monthly_queries.toLocaleString()}</td>
                   </tr>
                 ))}
+                {resources.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="py-8 px-6 text-center text-sm text-muted-foreground">
+                      No resources configured for this institution yet.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
