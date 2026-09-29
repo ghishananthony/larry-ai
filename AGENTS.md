@@ -8,3 +8,6 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+- Larry research flow lives in src/lib/larry/ (safety → understand → orchestrate → provider adapters) behind src/lib/larry.functions.ts; the old keyword engine was removed. Why: one workflow, LLM + real provider searches server-side.
+- Search adapters are keyed by exact resource name and only run when the caller's institution (resolved server-side, never from the client) lists that resource as active/trial. Why: the institution's configuration is authoritative for access.
