@@ -43,14 +43,15 @@ export type ResearchProfile = {
 export type TurnResult =
   | { kind: "blocked"; reply: string }
   | { kind: "clarify"; reply: string; profile: ResearchProfile | null }
-  | { kind: "confirm"; reply: string; profile: ResearchProfile }
+  | { kind: "confirm"; reply: string; profile: ResearchProfile; confirmationToken: string }
   | { kind: "error"; reply: string };
 
 export type SourceRecord = {
   id: string;
   title: string;
   authors: string[];
-  container: string | null; // journal / publisher
+  container: string | null; // journal / publication
+  publisher?: string | null;
   year: number | null;
   sourceType: string | null;
   /** true = provider flags it peer-reviewed; null = not verified. */
@@ -58,6 +59,10 @@ export type SourceRecord = {
   doi: string | null;
   url: string;
   foundIn: string; // institution resource name
+  /** Where the record metadata came from, e.g. "NCBI E-utilities", "Crossref". */
+  via?: string;
+  /** Access info reported by the provider, never guessed. */
+  access?: string | null;
   match?: "strong" | "partial";
   matchNote?: string;
 };
@@ -80,6 +85,6 @@ export type SearchResult =
       /** Relevant institution resources Larry cannot search yet (no integration). */
       notYetSearchable: string[];
       requested: number | null;
-      /** Set when results are fewer than requested — Larry asks, never auto-broadens. */
+      /** Factual note when fewer matches than requested were found. Never suggests changes. */
       narrowNotice: string | null;
     };

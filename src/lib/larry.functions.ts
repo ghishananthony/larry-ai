@@ -33,7 +33,7 @@ export const larryTurn = createServerFn({ method: "POST" })
 
 /** Runs only after the student confirms the profile. Institution resolved server-side. */
 export const larrySearch = createServerFn({ method: "POST" })
-  .inputValidator((d) => z.object({ profile: z.any() }).parse(d))
+  .inputValidator((d) => z.object({ profile: z.any(), confirmationToken: z.string().max(128) }).parse(d))
   .handler(async ({ data }): Promise<SearchResult> => {
     const { checkSafety, REFUSAL } = await import("./larry/safety.server");
     const { sanitizeProfile } = await import("./larry/understand.server");
@@ -41,6 +41,11 @@ export const larrySearch = createServerFn({ method: "POST" })
     const { runSearch } = await import("./larry/orchestrate.server");
     try {
       const profile: ResearchProfile = sanitizeProfile(data.profile);
+      const { verifyProfile } = await import("./larry/confirm.server");
+      // No search without a profile the server itself produced and presented for confirmation.
+      if (!verifyProfile(profile, data.confirmationToken)) {
+        return { kind: "error", reply: "Please confirm your research profile before Larry searches." };
+      }
       // Re-check the (client-held) profile so a tampered profile cannot bypass the gate.
       const safety = await checkSafety(JSON.stringify(profile));
       if (!safety.allowed) return { kind: "blocked", reply: REFUSAL };
