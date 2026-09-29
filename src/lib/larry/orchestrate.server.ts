@@ -7,7 +7,7 @@ const PLAN_SYSTEM = `You plan library database searches for a student's CONFIRME
 You receive: the profile, the searchable resources (with their query syntax), and the institution's other licensed resources that cannot be searched automatically yet.
 - Choose only searchable resources that genuinely fit the profile's discipline, population and source requirements (0-4). When more than one fits (e.g. PubMed and ERIC both index adolescent psychology), search each of them. Do not default to any single database.
 - Write one query per chosen resource in THAT provider's syntax, built from the student's own concepts, population and relationship plus the provided search vocabulary. Do NOT add concepts the student did not name. Do not include date/peer-review filters (applied automatically). Do not paste the student's sentence.
-- From the non-searchable list, pick up to 5 that fit the profile (exact names).
+- From the non-searchable list, pick up to 5 that fit the profile and return their exact "name" values.
 JSON only: {"searches":[{"resource":"exact name","query":"..."}],"alsoRelevant":["exact name"]}`;
 
 const RANK_SYSTEM = `You check how well real search records match a student's CONFIRMED research requirements.
@@ -21,7 +21,7 @@ const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 export async function runSearch(profile: ResearchProfile, resources: TenantResource[]): Promise<SearchResult> {
   const subscribed = new Set(resources.map((r) => r.name));
   const searchable = ADAPTERS.filter((a) => subscribed.has(a.resource));
-  const other = resources.filter((r) => !adapterFor(r.name)).map((r) => `${r.name} — ${r.disciplines.join(", ")}`);
+  const other = resources.filter((r) => !adapterFor(r.name)).map((r) => ({ name: r.name, subjects: r.disciplines.join(", ") }));
 
   const planOut = await callLlm(PLAN_SYSTEM, [
     {
