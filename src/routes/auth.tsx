@@ -59,9 +59,9 @@ function AuthPage() {
           password,
           options: {
             emailRedirectTo: `${window.location.origin}/profile`,
-            // Role is never accepted from the client. The backend assigns
-            // the Student role to every new account automatically.
-            data: { full_name: fullName.trim(), institution_slug: institutionSlug },
+            // Role and institution are never accepted from the client. The
+            // backend assigns the Student role and Menlo College automatically.
+            data: { full_name: fullName.trim() },
           },
         });
         if (err) throw err;
