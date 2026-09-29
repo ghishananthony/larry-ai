@@ -58,7 +58,7 @@ const DEV_ADAPTERS: Record<string, SearchAdapter> = { openalex };
 
 function isDevHost(host: string | null | undefined): boolean {
   if (!host) return false;
-  const h = host.toLowerCase().split(":")[0];
+  const h = host.toLowerCase().split(":")[0] ?? "";
   return h === "localhost" || h === "127.0.0.1" || h.startsWith("id-preview--") || h.endsWith("-dev.lovable.app");
 }
 
