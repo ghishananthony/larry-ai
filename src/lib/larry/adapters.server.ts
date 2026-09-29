@@ -145,5 +145,52 @@ const gutenberg: SearchAdapter = {
   },
 };
 
-export const ADAPTERS: SearchAdapter[] = [pubmed, eric, oapen, gutenberg];
+/**
+ * Publisher platforms searched through Crossref's official public metadata API,
+ * restricted to that publisher's Crossref member id. Records are real DOIs
+ * registered by the publisher; full text still depends on the library's license.
+ */
+function crossrefPublisher(resource: string, member: number, desc: string): SearchAdapter {
+  return {
+    resource,
+    capabilities: `${desc} Searched via Crossref bibliographic metadata: plain keywords/phrases only (no Boolean operators, no field tags), 3-8 words.`,
+    async search(query, profile, limit) {
+      const filters = [`member:${member}`, "type:journal-article"];
+      if (profile.yearFrom) filters.push(`from-pub-date:${profile.yearFrom}`);
+      if (profile.yearTo) filters.push(`until-pub-date:${profile.yearTo}`);
+      const params = new URLSearchParams({
+        "query.bibliographic": query.replace(/\b(AND|OR|NOT)\b|[()"]/g, " ").replace(/\s+/g, " ").trim(),
+        filter: filters.join(","),
+        rows: String(limit),
+        select: "DOI,title,author,container-title,publisher,issued,type,URL",
+        mailto: "larry-library-assistant@example.org",
+      });
+      const d = await getJson<{ message: { items: any[] } }>(`https://api.crossref.org/works?${params}`);
+      return d.message.items.map((r): SourceRecord => ({
+        id: `doi:${String(r.DOI).toLowerCase()}`,
+        title: (r.title ?? [])[0] ?? "",
+        authors: (r.author ?? []).map((a: any) => [a.given, a.family].filter(Boolean).join(" ")).filter(Boolean).slice(0, 8),
+        container: (r["container-title"] ?? [])[0] ?? null,
+        publisher: r.publisher ?? null,
+        year: r.issued?.["date-parts"]?.[0]?.[0] ?? null,
+        sourceType: "Journal article",
+        peerReviewed: null, // Crossref does not certify peer review
+        doi: r.DOI ?? null,
+        url: r.DOI ? `https://doi.org/${r.DOI}` : r.URL,
+        foundIn: resource,
+        via: "Crossref metadata",
+        access: "Full text through your library's subscription",
+      }));
+    },
+  };
+}
+
+const tandf = crossrefPublisher("Taylor & Francis Online", 301, "Taylor & Francis journals (social sciences, humanities, psychology, education, business, science).");
+const mitPress = crossrefPublisher("MIT Press Journals", 281, "MIT Press journals (economics, cognitive science, arts, computing, international affairs).");
+const scienceDirect = crossrefPublisher("ScienceDirect", 78, "Elsevier/ScienceDirect journals (sciences, health, psychology, social sciences, business).");
+const annualPsych: SearchAdapter = {
+  ...crossrefPublisher("Annual Review of Psychology", 22, "Annual Reviews (review articles; psychology)."),
+};
+
+export const ADAPTERS: SearchAdapter[] = [pubmed, eric, oapen, gutenberg, tandf, mitPress, scienceDirect, annualPsych];
 export const adapterFor = (resourceName: string) => ADAPTERS.find((a) => a.resource === resourceName);
