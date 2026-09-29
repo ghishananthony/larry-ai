@@ -50,7 +50,12 @@ export const larrySearch = createServerFn({ method: "POST" })
       const safety = await checkSafety(JSON.stringify(profile));
       if (!safety.allowed) return { kind: "blocked", reply: REFUSAL };
       const tenant = await resolveTenant();
-      return await runSearch(profile, tenant.resources);
+      // Development/test-only providers (never institution resources); fail closed off dev hosts.
+      const { enabledDevAdapters } = await import("./larry/dev-providers.server");
+      const { getRequest } = await import("@tanstack/react-start/server");
+      let host: string | null = null;
+      try { host = new URL(getRequest().url).host; } catch { host = null; }
+      return await runSearch(profile, tenant.resources, enabledDevAdapters(host));
     } catch (e) {
       console.error("larrySearch", e);
       return { kind: "error", reply: friendly(e) };
