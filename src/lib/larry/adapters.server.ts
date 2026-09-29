@@ -21,6 +21,9 @@ async function getJson<T>(url: string): Promise<T> {
   return (await res.json()) as T;
 }
 
+const decode = (s: string) =>
+  s.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+
 const yearOf = (s: unknown) => {
   const m = String(s ?? "").match(/\b(1[5-9]|20)\d{2}\b/);
   return m ? Number(m[0]) : null;
@@ -168,9 +171,9 @@ function crossrefPublisher(resource: string, member: number, desc: string, extra
       const d = await getJson<{ message: { items: any[] } }>(`https://api.crossref.org/works?${params}`);
       return d.message.items.map((r): SourceRecord => ({
         id: `doi:${String(r.DOI).toLowerCase()}`,
-        title: (r.title ?? [])[0] ?? "",
+        title: decode((r.title ?? [])[0] ?? ""),
         authors: (r.author ?? []).map((a: any) => [a.given, a.family].filter(Boolean).join(" ")).filter(Boolean).slice(0, 8),
-        container: (r["container-title"] ?? [])[0] ?? null,
+        container: decode((r["container-title"] ?? [])[0] ?? "") || null,
         publisher: r.publisher ?? null,
         year: r.issued?.["date-parts"]?.[0]?.[0] ?? null,
         sourceType: "Journal article",
