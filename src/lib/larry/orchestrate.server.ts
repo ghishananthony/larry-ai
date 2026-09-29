@@ -5,13 +5,14 @@ import type { TenantResource } from "./tenant.server";
 
 const PLAN_SYSTEM = `You plan library database searches for a student's CONFIRMED research profile.
 You receive: the profile, the searchable resources (with their query syntax), and the institution's other licensed resources that cannot be searched automatically yet.
-- Choose only searchable resources that genuinely fit the profile's discipline and source requirements (0-4). Do not default to any single database.
+- Choose only searchable resources that genuinely fit the profile's discipline, population and source requirements (0-4). When more than one fits (e.g. PubMed and ERIC both index adolescent psychology), search each of them. Do not default to any single database.
 - Write one query per chosen resource in THAT provider's syntax, built from the student's own concepts, population and relationship plus the provided search vocabulary. Do NOT add concepts the student did not name. Do not include date/peer-review filters (applied automatically). Do not paste the student's sentence.
 - From the non-searchable list, pick up to 5 that fit the profile (exact names).
 JSON only: {"searches":[{"resource":"exact name","query":"..."}],"alsoRelevant":["exact name"]}`;
 
 const RANK_SYSTEM = `You check how well real search records match a student's CONFIRMED research requirements.
 Judge ONLY from the given metadata (title, venue, year, type). Do not invent details, do not summarize or explain content, do not say what a source proves.
+"strong" = matches the student's core concepts, focus and population; "partial" = matches most of them; "weak" = off-topic.
 For each record return match "strong", "partial" or "weak" and a note of at most 15 words naming which stated requirements it matches (e.g. "Matches social media, self-esteem and adolescent population").
 JSON only: {"ratings":[{"id":"...","match":"strong|partial|weak","note":"..."}]}`;
 
@@ -45,7 +46,7 @@ export async function runSearch(profile: ResearchProfile, resources: TenantResou
   const batches = await Promise.all(
     searches.map(async (s) => {
       try {
-        const recs = await adapterFor(s.resource)!.search(s.query, profile, 15);
+        const recs = await adapterFor(s.resource)!.search(s.query, profile, 25);
         runs.push({ resource: s.resource, query: s.query, status: recs.length ? "ok" : "no_results", count: recs.length });
         return recs;
       } catch (e) {
