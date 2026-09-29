@@ -12,7 +12,9 @@ JSON only: {"searches":[{"resource":"exact name","query":"..."}],"alsoRelevant":
 
 const RANK_SYSTEM = `You check how well real search records match a student's CONFIRMED research requirements.
 Judge ONLY from the given metadata (title, venue, year, type). Do not invent details, do not summarize or explain content, do not say what a source proves.
-"strong" = matches the student's core concepts, focus and population; "partial" = matches most of them; "weak" = off-topic.
+"strong" = matches ALL of the student's core concepts, focus and population.
+"partial" = still matches EVERY core concept and the stated population, but a secondary detail (e.g. exact wording, method, setting) cannot be confirmed from the metadata.
+"weak" = missing or replacing ANY core concept, the focus, or the stated population (e.g. a broader population, a broader or different concept). Never rate a broader record as partial — that would change the student's scope.
 For each record return match "strong", "partial" or "weak" and a note of at most 15 words naming which stated requirements it matches (e.g. "Matches social media, self-esteem and adolescent population").
 JSON only: {"ratings":[{"id":"...","match":"strong|partial|weak","note":"..."}]}`;
 
