@@ -1,5 +1,5 @@
 import type { ProviderRun, ResearchProfile, SearchResult, SourceRecord } from "./types";
-import { ADAPTERS, adapterFor } from "./adapters.server";
+import { ADAPTERS, adapterFor, type SearchAdapter } from "./adapters.server";
 import { callLlm, parseJson } from "./llm.server";
 import type { TenantResource } from "./tenant.server";
 
@@ -20,9 +20,15 @@ JSON only: {"ratings":[{"id":"...","match":"strong|partial|weak","note":"..."}]}
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
-export async function runSearch(profile: ResearchProfile, resources: TenantResource[]): Promise<SearchResult> {
+export async function runSearch(
+  profile: ResearchProfile,
+  resources: TenantResource[],
+  devAdapters: SearchAdapter[] = [],
+): Promise<SearchResult> {
   const subscribed = new Set(resources.map((r) => r.name));
-  const searchable = ADAPTERS.filter((a) => subscribed.has(a.resource));
+  // Dev/test providers are a separate list; they never touch the tenant rule below.
+  const dev = new Map(devAdapters.filter((a) => !adapterFor(a.resource)).map((a) => [a.resource, a]));
+  const searchable = [...ADAPTERS.filter((a) => subscribed.has(a.resource)), ...dev.values()];
   const other = resources.filter((r) => !adapterFor(r.name)).map((r) => ({ name: r.name, subjects: r.disciplines.join(", ") }));
 
   const planOut = await callLlm(PLAN_SYSTEM, [
@@ -38,9 +44,9 @@ export async function runSearch(profile: ResearchProfile, resources: TenantResou
   const plan = parseJson<{ searches?: { resource: string; query: string }[]; alsoRelevant?: string[] }>(planOut);
 
   const searches = (plan.searches ?? [])
-    .filter((s) => subscribed.has(s.resource) && adapterFor(s.resource) && s.query?.trim())
+    .filter((s) => ((subscribed.has(s.resource) && adapterFor(s.resource)) || dev.has(s.resource)) && s.query?.trim())
     .filter((s, i, a) => a.findIndex((x) => x.resource === s.resource) === i)
-    .slice(0, 8);
+    .slice(0, 9);
   const notYetSearchable = (plan.alsoRelevant ?? [])
     .filter((n) => subscribed.has(n) && !adapterFor(n))
     .slice(0, 6);
@@ -49,7 +55,8 @@ export async function runSearch(profile: ResearchProfile, resources: TenantResou
   const batches = await Promise.all(
     searches.map(async (s) => {
       try {
-        const recs = await adapterFor(s.resource)!.search(s.query, profile, 20);
+        const adapter = subscribed.has(s.resource) && adapterFor(s.resource) ? adapterFor(s.resource)! : dev.get(s.resource)!;
+        const recs = await adapter.search(s.query, profile, 20);
         runs.push({ resource: s.resource, query: s.query, status: recs.length ? "ok" : "no_results", count: recs.length });
         return recs;
       } catch (e) {
