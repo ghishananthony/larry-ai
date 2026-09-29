@@ -11,14 +11,22 @@ You receive: the profile, the searchable resources (with their query syntax), an
 JSON only: {"searches":[{"resource":"exact name","query":"..."}],"alsoRelevant":["exact name"]}`;
 
 const RANK_SYSTEM = `You check how well real search records match a student's CONFIRMED research requirements.
-Judge ONLY from the given metadata (title, venue, year, type). Do not invent details, do not summarize or explain content, do not say what a source proves.
+Judge ONLY from the given metadata (title, venue, year, type, peerReview). Do not invent details, do not summarize or explain content, do not say what a source proves.
 "strong" = matches ALL of the student's core concepts, focus and population.
 "partial" = still matches EVERY core concept and the stated population, but a secondary detail (e.g. exact wording, method, setting) cannot be confirmed from the metadata.
 "weak" = missing or replacing ANY core concept, the focus, or the stated population (e.g. a broader population, a broader or different concept). Never rate a broader record as partial — that would change the student's scope.
-For each record return match "strong", "partial" or "weak" and a note of at most 15 words naming which stated requirements it matches (e.g. "Matches social media, self-esteem and adolescent population").
-JSON only: {"ratings":[{"id":"...","match":"strong|partial|weak","note":"..."}]}`;
+For every strong or partial record also give "score" 0-100: how closely its metadata fits the requirements — every core concept present (not broader/different), the exact stated population, the stated relationship between concepts reflected, the requested source type, the requested dates. Compare records against each other so the closest fits score highest.
+peerReview "verified" means the database flagged it peer-reviewed and may raise the score slightly. "not reported" means UNKNOWN — never treat it as not peer-reviewed and never lower the score for it. Peer review never outweighs a concept, population or relationship mismatch.
+For each record return match "strong", "partial" or "weak", score, and a note of at most 15 words naming which stated requirements it matches (e.g. "Matches social media, self-esteem and adolescent population").
+JSON only: {"ratings":[{"id":"r1","match":"strong|partial|weak","score":0,"note":"..."}]}`;
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+/** Provider-neutral, deterministic ordering key (FNV-1a of the normalized title). */
+const titleHash = (s: string) => {
+  let h = 0x811c9dc5;
+  for (const c of norm(s)) h = Math.imul(h ^ c.charCodeAt(0), 0x01000193) >>> 0;
+  return h;
+};
 
 export async function runSearch(
   profile: ResearchProfile,
@@ -84,25 +92,47 @@ export async function runSearch(
 
   let sources: SourceRecord[] = [];
   if (pool.length) {
+    // Neutral input order and neutral refs: the rater never sees which database returned a record.
+    const ordered = [...pool].sort((a, b) => titleHash(a.title) - titleHash(b.title));
+    const refOf = new Map(ordered.map((r, i) => [r, `r${i + 1}`]));
     const rankOut = await callLlm(RANK_SYSTEM, [
       {
         role: "user",
         content: JSON.stringify({
           requirements: profile,
-          records: pool.map((r) => ({ id: r.id, title: r.title, venue: r.container, year: r.year, type: r.sourceType })),
+          records: ordered.map((r) => ({
+            id: refOf.get(r),
+            title: r.title,
+            venue: r.container,
+            year: r.year,
+            type: r.sourceType,
+            peerReview: r.peerReviewed === true ? "verified" : "not reported",
+          })),
         }),
       },
     ]);
-    const ratings = parseJson<{ ratings?: { id: string; match: string; note: string }[] }>(rankOut).ratings ?? [];
-    const byId = new Map(ratings.map((x) => [x.id, x]));
-    sources = pool
-      .map((r): SourceRecord | null => {
-        const x = byId.get(r.id);
+    const ratings = parseJson<{ ratings?: { id: string; match: string; score?: unknown; note: string }[] }>(rankOut).ratings ?? [];
+    const byRef = new Map(ratings.map((x) => [x.id, x]));
+    const scored = ordered
+      .map((r) => {
+        const x = byRef.get(refOf.get(r)!);
         if (!x || (x.match !== "strong" && x.match !== "partial")) return null;
-        return { ...r, match: x.match as "strong" | "partial", matchNote: String(x.note ?? "").slice(0, 140) };
+        const n = Number(x.score);
+        const score = Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 50;
+        const src: SourceRecord = { ...r, match: x.match as "strong" | "partial", matchNote: String(x.note ?? "").slice(0, 140) };
+        return { src, score };
       })
-      .filter((r): r is SourceRecord => r !== null)
-      .sort((a, b) => (a.match === b.match ? 0 : a.match === "strong" ? -1 : 1));
+      .filter((v): v is { src: SourceRecord; score: number } => v !== null);
+    const tier = (m?: string) => (m === "strong" ? 0 : 1);
+    const pr = (r: SourceRecord) => (profile.peerReviewed && r.peerReviewed === true ? 0 : 1);
+    scored.sort(
+      (a, b) =>
+        tier(a.src.match) - tier(b.src.match) ||
+        b.score - a.score ||
+        pr(a.src) - pr(b.src) ||
+        titleHash(a.src.title) - titleHash(b.src.title),
+    );
+    sources = scored.map((v) => v.src);
   }
 
   // The student's requested count is carried from the confirmed profile to here unchanged.
