@@ -82,6 +82,7 @@ function WidgetPage() {
   const [stage, setStage] = useState<Stage>("chat");
   const [profile, setProfile] = useState<ResearchProfile | null>(null);
   const [result, setResult] = useState<SearchResult | null>(null);
+  const [token, setToken] = useState<string | null>(null);
 
   const [chatId, setChatId] = useState<string | null>(null);
   const [guestPromptDismissed, setGuestPromptDismissed] = useState(false);
@@ -136,6 +137,7 @@ function WidgetPage() {
       if (res.kind === "error") return;
       const nextProfile = res.profile ?? profile;
       const nextStage: Stage = res.kind === "confirm" ? "confirm" : "chat";
+      setToken(res.kind === "confirm" ? res.confirmationToken : null);
       setProfile(nextProfile);
       setStage(nextStage);
       setResult(null);
@@ -149,14 +151,15 @@ function WidgetPage() {
   };
 
   const confirmAndSearch = async () => {
-    if (!profile) return;
+    if (!profile || !token || stage !== "confirm") return;
     setStage("searching");
     try {
-      const res = await searchFn({ data: { profile } });
+      const res = await searchFn({ data: { profile, confirmationToken: token } });
       if (res.kind === "blocked") {
         setMessages((m) => [...m, { role: "assistant", content: res.reply }]);
         setStage("blocked");
         setProfile(null);
+        setToken(null);
         return;
       }
       if (res.kind === "error") {
@@ -180,6 +183,7 @@ function WidgetPage() {
     setStage("chat");
     setProfile(null);
     setResult(null);
+    setToken(null);
     inputRef.current?.focus();
   };
 
@@ -198,9 +202,11 @@ function WidgetPage() {
     const r = (row.terms as SearchResult | null) ?? null;
     const validProfile = p && Array.isArray((p as ResearchProfile).studentProvided) ? p : null;
     const validResult = r && (r as SearchResult).kind === "results" ? r : null;
+    // Saved chats never carry a confirmation token: a reopened profile must be re-confirmed through Larry.
+    setToken(null);
     setProfile(validProfile);
     setResult(validResult);
-    setStage(validResult ? "results" : validProfile && row.stage === "confirm" ? "confirm" : "chat");
+    setStage(validResult ? "results" : "chat");
   };
 
   return (
@@ -292,7 +298,7 @@ function WidgetPage() {
               ))}
               {busy && <p className="text-sm text-muted-foreground italic">Larry is reading your request…</p>}
 
-              {profile && (stage === "confirm" || stage === "searching") && (
+              {profile && !result && (stage === "confirm" || stage === "searching") && (
                 <ProfileCard profile={profile} searching={stage === "searching"} onConfirm={confirmAndSearch} />
               )}
 
@@ -488,6 +494,8 @@ function Results({ result }: { result: Extract<SearchResult, { kind: "results" }
                 <p className="text-xs mt-1 text-muted-foreground">
                   Peer review: {s.peerReviewed ? "flagged peer-reviewed by provider" : "not verified"} · Found in{" "}
                   <span className="text-foreground">{s.foundIn}</span>
+                  {s.via && <> (via {s.via})</>}
+                  {s.publisher && <> · {s.publisher}</>}
                   {s.doi && <> · DOI {s.doi}</>}
                 </p>
                 {s.matchNote && <p className="text-xs mt-2 italic">Why it's listed: {s.matchNote}</p>}

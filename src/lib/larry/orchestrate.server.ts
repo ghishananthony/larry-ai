@@ -5,9 +5,9 @@ import type { TenantResource } from "./tenant.server";
 
 const PLAN_SYSTEM = `You plan library database searches for a student's CONFIRMED research profile.
 You receive: the profile, the searchable resources (with their query syntax), and the institution's other licensed resources that cannot be searched automatically yet.
-- Choose only searchable resources that genuinely fit the profile's discipline, population and source requirements (0-4). When more than one fits (e.g. PubMed and ERIC both index adolescent psychology), search each of them. Do not default to any single database.
+- Choose EVERY searchable resource that plausibly fits the profile's discipline, concepts, population and source requirements (0-8). Search all of them — never stop at one. Do not default to any single database. Skip resources whose content type cannot meet an explicit source requirement (e.g. public-domain books when peer-reviewed articles are required).
 - Write one query per chosen resource in THAT provider's syntax, built from the student's own concepts, population and relationship plus the provided search vocabulary. Do NOT add concepts the student did not name. Do not include date/peer-review filters (applied automatically). Do not paste the student's sentence.
-- From the non-searchable list, pick up to 5 that fit the profile and return their exact "name" values.
+- From the non-searchable list, pick up to 6 that fit the profile and return their exact "name" values.
 JSON only: {"searches":[{"resource":"exact name","query":"..."}],"alsoRelevant":["exact name"]}`;
 
 const RANK_SYSTEM = `You check how well real search records match a student's CONFIRMED research requirements.
@@ -37,16 +37,17 @@ export async function runSearch(profile: ResearchProfile, resources: TenantResou
 
   const searches = (plan.searches ?? [])
     .filter((s) => subscribed.has(s.resource) && adapterFor(s.resource) && s.query?.trim())
-    .slice(0, 4);
+    .filter((s, i, a) => a.findIndex((x) => x.resource === s.resource) === i)
+    .slice(0, 8);
   const notYetSearchable = (plan.alsoRelevant ?? [])
     .filter((n) => subscribed.has(n) && !adapterFor(n))
-    .slice(0, 5);
+    .slice(0, 6);
 
   const runs: ProviderRun[] = [];
   const batches = await Promise.all(
     searches.map(async (s) => {
       try {
-        const recs = await adapterFor(s.resource)!.search(s.query, profile, 25);
+        const recs = await adapterFor(s.resource)!.search(s.query, profile, 20);
         runs.push({ resource: s.resource, query: s.query, status: recs.length ? "ok" : "no_results", count: recs.length });
         return recs;
       } catch (e) {
@@ -61,11 +62,14 @@ export async function runSearch(profile: ResearchProfile, resources: TenantResou
   const pool: SourceRecord[] = [];
   for (const r of batches.flat()) {
     if (!r.title) continue;
-    const key = r.doi ? `doi:${r.doi.toLowerCase()}` : `t:${norm(r.title)}`;
-    if (seen.has(key)) continue;
+    // DOI first; otherwise conservative title + year + first-author surname (never title alone).
+    const surname = norm(r.authors[0] ?? "").split(" ").pop() ?? "";
+    const keys = [r.doi ? `doi:${r.doi.toLowerCase()}` : null, `t:${norm(r.title)}|${r.year ?? "?"}|${surname}`].filter(Boolean) as string[];
+    if (keys.some((k) => seen.has(k))) continue;
+    if (profile.peerReviewed && /public-domain book/i.test(r.sourceType ?? "")) continue;
     if (r.year && profile.yearFrom && r.year < profile.yearFrom) continue;
     if (r.year && profile.yearTo && r.year > profile.yearTo) continue;
-    seen.add(key);
+    keys.forEach((k) => seen.add(k));
     pool.push(r);
   }
 
@@ -92,17 +96,17 @@ export async function runSearch(profile: ResearchProfile, resources: TenantResou
       .sort((a, b) => (a.match === b.match ? 0 : a.match === "strong" ? -1 : 1));
   }
 
+  // The student's requested count is carried from the confirmed profile to here unchanged.
   const requested = profile.sourceCount;
-  const limit = Math.max(requested ?? 10, 5) + 3;
-  sources = sources.slice(0, limit);
+  sources = sources.slice(0, requested ?? 10);
 
   let narrowNotice: string | null = null;
-  const strong = sources.filter((s) => s.match === "strong").length;
+  const searched = runs.filter((r) => r.status !== "error").map((r) => r.resource);
   if (searches.length === 0) {
     narrowNotice =
-      "None of the resources Larry can search automatically fit this profile yet. The licensed resources listed below may help — Larry will not change your scope unless you choose to.";
-  } else if ((requested && strong < requested) || sources.length === 0) {
-    narrowNotice = `Your current requirements returned ${strong} strong match${strong === 1 ? "" : "es"}${requested ? ` (you asked for ${requested})` : ""}. They may be limiting results. Would you like to broaden a specific requirement — for example the date range, population, or source type? Larry will not change your scope unless you choose to.`;
+      "None of the resources Larry can search automatically fit your confirmed profile, so no sources were retrieved. The library resources listed below may be relevant; you can search them directly.";
+  } else if ((requested && sources.length < requested) || sources.length === 0) {
+    narrowNotice = `Larry found ${sources.length} matching source${sources.length === 1 ? "" : "s"}${requested ? ` of the ${requested} you asked for` : ""} after searching ${searched.join(", ") || "no reachable providers"}. No sources were invented to fill the gap, and your requirements were not changed. The library resources listed below could not be searched automatically. Any change to your requirements is your decision.`;
   }
 
   return { kind: "results", sources, runs, notYetSearchable, requested, narrowNotice };
