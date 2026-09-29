@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { SiteFooter, SiteNav } from "@/components/SiteNav";
 import { useAuth } from "@/hooks/useAuth";
@@ -10,20 +11,8 @@ import {
   useSaveResearchChat,
   type ResearchChatRow,
 } from "@/hooks/useResearchChats";
-import { getInstitution, institutions } from "@/lib/institutions";
-import {
-  analyzeRequest,
-  buildClarifications,
-  buildProfile,
-  executeSearch,
-  generateSearchTerms,
-  selectResources,
-  type ClarificationQuestion,
-  type ResearchProfile,
-  type ResourceChoice,
-  type SearchExecution,
-  type SearchTerms,
-} from "@/lib/research-workflow";
+import { larrySearch, larryTurn } from "@/lib/larry.functions";
+import type { ChatMessage, ProfileKey, ResearchProfile, SearchResult } from "@/lib/larry/types";
 
 export const Route = createFileRoute("/widget")({
   head: () => ({
@@ -32,13 +21,12 @@ export const Route = createFileRoute("/widget")({
       {
         name: "description",
         content:
-          "Enter your own research goal. Larry clarifies, builds a research profile you confirm, then generates structured search terms for the databases your institution licenses.",
+          "Describe your research need in your own words. Larry clarifies, builds a profile you confirm, then searches your library's resources for specific sources.",
       },
       { property: "og:title", content: "Student Widget — Larry for Libraries" },
       {
         property: "og:description",
-        content:
-          "Larry matches a student's confirmed research requirements to their library's licensed databases and catalog.",
+        content: "Larry searches your library's licensed and open resources for specific sources that match your confirmed requirements.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -47,21 +35,15 @@ export const Route = createFileRoute("/widget")({
   component: WidgetPage,
 });
 
-const SOURCE_TYPES = [
-  "Peer-reviewed articles",
-  "Books & e-books",
-  "Dissertations",
-  "Primary sources",
-];
+type Stage = "chat" | "confirm" | "searching" | "results" | "blocked";
 
-type Stage = "request" | "clarify" | "profile" | "search";
+type Saved = { transcript?: string };
 
-const STAGES: { id: Stage; label: string }[] = [
-  { id: "request", label: "1. Your request" },
-  { id: "clarify", label: "2. Clarification" },
-  { id: "profile", label: "3. Confirm profile" },
-  { id: "search", label: "4. Search" },
-];
+const WELCOME: ChatMessage = {
+  role: "assistant",
+  content:
+    "Hi, I'm Larry. Tell me what you're researching and what your assignment requires — in your own words. I'll ask about anything unclear, confirm your requirements with you, then search the library for specific sources.",
+};
 
 function Label({ children }: { children: React.ReactNode }) {
   return (
@@ -71,153 +53,154 @@ function Label({ children }: { children: React.ReactNode }) {
   );
 }
 
+const PROFILE_ROWS: { key: ProfileKey; label: string; value: (p: ResearchProfile) => string | null }[] = [
+  { key: "topic", label: "Topic", value: (p) => p.topic },
+  { key: "focus", label: "Focus", value: (p) => p.focus },
+  { key: "population", label: "Population", value: (p) => p.population },
+  { key: "discipline", label: "Discipline", value: (p) => p.discipline },
+  { key: "relationship", label: "Relationship", value: (p) => p.relationship },
+  {
+    key: "sourceTypes",
+    label: "Source requirement",
+    value: (p) =>
+      [p.sourceTypes.join(", "), p.peerReviewed ? "peer-reviewed" : ""].filter(Boolean).join(" · ") || null,
+  },
+  { key: "dateRequirement", label: "Date", value: (p) => p.dateRequirement },
+  { key: "sourceCount", label: "Sources requested", value: (p) => (p.sourceCount ? String(p.sourceCount) : null) },
+  { key: "otherConstraints", label: "Other requirements", value: (p) => p.otherConstraints.join("; ") || null },
+];
+
 function WidgetPage() {
   const { session } = useAuth();
   const access = useInstitutionAccess();
-  const [slug, setSlug] = useState(institutions[0]!.slug);
-  const [goal, setGoal] = useState("");
-  const [types, setTypes] = useState<string[]>(["Peer-reviewed articles"]);
+  const turnFn = useServerFn(larryTurn);
+  const searchFn = useServerFn(larrySearch);
 
-  const [stage, setStage] = useState<Stage>("request");
-  const [questions, setQuestions] = useState<ClarificationQuestion[]>([]);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [messages, setMessages] = useState<ChatMessage[]>([WELCOME]);
+  const [input, setInput] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [stage, setStage] = useState<Stage>("chat");
   const [profile, setProfile] = useState<ResearchProfile | null>(null);
-  const [terms, setTerms] = useState<SearchTerms | null>(null);
-  const [choices, setChoices] = useState<ResourceChoice[]>([]);
-  const [execution, setExecution] = useState<SearchExecution | null>(null);
-  const [broadenAcknowledged, setBroadenAcknowledged] = useState(false);
+  const [result, setResult] = useState<SearchResult | null>(null);
 
   const [chatId, setChatId] = useState<string | null>(null);
   const [guestPromptDismissed, setGuestPromptDismissed] = useState(false);
   const chats = useResearchChats();
   const saveChat = useSaveResearchChat();
   const deleteChat = useDeleteResearchChat();
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const endRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [messages, stage, busy]);
+
+  const institutionName = session ? (access.data?.name ?? "your institution") : "Menlo College";
 
   /** Chats are only ever persisted for a signed-in student. Guests are never saved. */
-  const persist = (next: {
-    stage: Stage;
-    profile: ResearchProfile | null;
-    terms: SearchTerms | null;
-    answers: Record<string, string>;
-  }) => {
+  const persist = (next: { stage: Stage; msgs: ChatMessage[]; profile: ResearchProfile | null; result: SearchResult | null }) => {
     if (!session) return;
+    const firstUser = next.msgs.find((m) => m.role === "user")?.content ?? "";
     saveChat.mutate(
       {
         id: chatId,
-        title: goal.trim().slice(0, 120) || "New research chat",
-        goal,
-        sourceTypes: types,
+        title: firstUser.trim().slice(0, 120) || "New research chat",
+        goal: firstUser,
+        sourceTypes: next.profile?.sourceTypes ?? [],
         stage: next.stage,
-        answers: next.answers,
+        answers: { transcript: JSON.stringify(next.msgs) },
         profile: next.profile,
-        terms: next.terms,
+        terms: next.result,
       },
       { onSuccess: (id) => id && setChatId(id) },
     );
   };
 
-
-  // A signed-in student is always pinned to the institution recorded on their
-  // profile in the database; the selector is only a demo affordance for visitors.
-  const enrolledSlug = access.data?.slug ?? null;
-  const activeSlug = session ? (enrolledSlug ?? institutions[0]!.slug) : slug;
-  const institution = getInstitution(activeSlug);
-
-  const reset = () => {
-    setStage("request");
-    setQuestions([]);
-    setAnswers({});
-    setProfile(null);
-    setTerms(null);
-    setChoices([]);
-    setExecution(null);
-    setBroadenAcknowledged(false);
-  };
-
-  const toggleType = (t: string) =>
-    setTypes((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
-
-  const analysis = useMemo(() => (goal.trim() ? analyzeRequest(goal) : null), [goal]);
-
-  /** Stage 2 → 3: analyze, ask only if needed. */
-  const analyze = () => {
-    if (!goal.trim()) return;
-    const pending = buildClarifications(analyzeRequest(goal)).filter(
-      (q) => !(q.id === "sourceTypes" && types.length > 0),
-    );
-    if (pending.length > 0) {
-      setQuestions(pending);
-      setStage("clarify");
-      return;
+  const send = async () => {
+    const text = input.trim();
+    if (!text || busy || stage === "blocked" || stage === "searching") return;
+    const msgs: ChatMessage[] = [...messages, { role: "user", content: text }];
+    setMessages(msgs);
+    setInput("");
+    setBusy(true);
+    try {
+      const res = await turnFn({ data: { messages: msgs.filter((m) => m !== WELCOME), profile } });
+      const withReply: ChatMessage[] = [...msgs, { role: "assistant", content: res.reply }];
+      setMessages(withReply);
+      if (res.kind === "blocked") {
+        setStage("blocked");
+        setProfile(null);
+        setResult(null);
+        return; // never persisted, never searched
+      }
+      if (res.kind === "error") return;
+      const nextProfile = res.profile ?? profile;
+      const nextStage: Stage = res.kind === "confirm" ? "confirm" : "chat";
+      setProfile(nextProfile);
+      setStage(nextStage);
+      setResult(null);
+      persist({ stage: nextStage, msgs: withReply, profile: nextProfile, result: null });
+    } catch {
+      setMessages([...msgs, { role: "assistant", content: "Something went wrong. Please try again." }]);
+    } finally {
+      setBusy(false);
+      inputRef.current?.focus();
     }
-    makeProfile({});
   };
 
-  /** Stage 5: build the profile from student-provided information only. */
-  const makeProfile = (currentAnswers: Record<string, string>) => {
-    const p = buildProfile({ goal, selectedSourceTypes: types, answers: currentAnswers });
-    setProfile(p);
-    setStage("profile");
-    persist({ stage: "profile", profile: p, terms: null, answers: currentAnswers });
-  };
-
-  const submitAnswers = () => {
-    const unanswered = questions.filter((q) => !answers[q.id]?.trim());
-    if (unanswered.length > 0) return;
-    makeProfile(answers);
-  };
-
-  /** Stages 6→9: only runs after explicit confirmation. */
-  const confirmAndSearch = () => {
+  const confirmAndSearch = async () => {
     if (!profile) return;
-    const t = generateSearchTerms(profile);
-    const c = selectResources(institution, profile);
-    setTerms(t);
-    setChoices(c);
-    setExecution(c[0] ? executeSearch(institution, c[0], t) : null);
-    setStage("search");
-    persist({ stage: "search", profile, terms: t, answers });
+    setStage("searching");
+    try {
+      const res = await searchFn({ data: { profile } });
+      if (res.kind === "blocked") {
+        setMessages((m) => [...m, { role: "assistant", content: res.reply }]);
+        setStage("blocked");
+        setProfile(null);
+        return;
+      }
+      if (res.kind === "error") {
+        setMessages((m) => [...m, { role: "assistant", content: res.reply }]);
+        setStage("confirm");
+        return;
+      }
+      setResult(res);
+      setStage("results");
+      persist({ stage: "results", msgs: messages, profile, result: res });
+    } catch {
+      setMessages((m) => [...m, { role: "assistant", content: "The search failed. Please try again." }]);
+      setStage("confirm");
+    }
   };
 
-  /** Start a brand-new research chat (signed-in students get a new saved record). */
   const newChat = () => {
     setChatId(null);
-    setGoal("");
-    setTypes(["Peer-reviewed articles"]);
-    reset();
+    setMessages([WELCOME]);
+    setInput("");
+    setStage("chat");
+    setProfile(null);
+    setResult(null);
+    inputRef.current?.focus();
   };
 
-  /** Restore a previously saved chat. No workflow step is skipped or auto-run. */
   const openChat = (row: ResearchChatRow) => {
     setChatId(row.id);
-    setGoal(row.goal);
-    setTypes(row.source_types ?? []);
-    setAnswers(row.answers ?? {});
-    setQuestions([]);
-    setChoices([]);
-    setExecution(null);
-    setBroadenAcknowledged(false);
-
-    const savedProfile = (row.profile as ResearchProfile | null) ?? null;
-    const savedTerms = (row.terms as SearchTerms | null) ?? null;
-    setProfile(savedProfile);
-    setTerms(savedTerms);
-
-    if (row.stage === "search" && savedProfile && savedTerms) {
-      const c = selectResources(getInstitution(activeSlug), savedProfile);
-      setChoices(c);
-      setExecution(c[0] ? executeSearch(getInstitution(activeSlug), c[0], savedTerms) : null);
-      setStage("search");
-    } else if (savedProfile) {
-      setStage("profile");
-    } else {
-      setStage("request");
+    let msgs: ChatMessage[] = [WELCOME];
+    try {
+      const t = (row.answers as Saved)?.transcript;
+      if (t) msgs = [WELCOME, ...(JSON.parse(t) as ChatMessage[]).filter((m) => m.content !== WELCOME.content)];
+    } catch {
+      /* legacy chat format */
+      if (row.goal) msgs = [WELCOME, { role: "user", content: row.goal }];
     }
-  };
-
-  const runWith = (choice: ResourceChoice) => {
-    if (!terms) return;
-    setExecution(executeSearch(institution, choice, terms));
+    setMessages(msgs);
+    const p = (row.profile as ResearchProfile | null) ?? null;
+    const r = (row.terms as SearchResult | null) ?? null;
+    const validProfile = p && Array.isArray((p as ResearchProfile).studentProvided) ? p : null;
+    const validResult = r && (r as SearchResult).kind === "results" ? r : null;
+    setProfile(validProfile);
+    setResult(validResult);
+    setStage(validResult ? "results" : validProfile && row.stage === "confirm" ? "confirm" : "chat");
   };
 
   return (
@@ -236,423 +219,142 @@ function WidgetPage() {
           </div>
           <div className="text-sm">
             <Label>Your institution</Label>
-            {session ? (
-              <p className="px-3 py-2 text-sm">{institution.name}</p>
-            ) : (
-              <select
-                value={slug}
-                onChange={(e) => {
-                  setSlug(e.target.value);
-                  reset();
-                }}
-                className="bg-card border border-input rounded-lg px-3 py-2 text-sm"
-              >
-                {institutions.map((i) => (
-                  <option key={i.slug} value={i.slug}>
-                    {i.name}
-                  </option>
-                ))}
-              </select>
-            )}
+            <p className="px-3 py-2 text-sm">{institutionName}</p>
           </div>
         </div>
 
-        <ol className="flex flex-wrap gap-2 mb-6">
-          {STAGES.map((s) => {
-            const active = s.id === stage;
-            const done = STAGES.findIndex((x) => x.id === stage) > STAGES.findIndex((x) => x.id === s.id);
-            return (
-              <li
-                key={s.id}
-                className={`px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider border ${
-                  active
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : done
-                      ? "border-accent text-accent"
-                      : "border-input text-muted-foreground"
-                }`}
-              >
-                {s.label}
-              </li>
-            );
-          })}
-        </ol>
-
         <div className="flex flex-col lg:flex-row gap-6 items-start">
-        {session && (
-          <aside className="w-full lg:w-64 shrink-0 bg-card rounded-2xl border border-border shadow-panel p-5">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-[10px] uppercase tracking-wider font-bold">Previous chats</p>
-            </div>
-            <button
-              type="button"
-              onClick={newChat}
-              className="w-full bg-primary text-primary-foreground py-2 rounded-lg text-xs font-bold uppercase tracking-wider mb-4"
-            >
-              New research chat
-            </button>
-            {chats.isLoading && <p className="text-xs text-muted-foreground">Loading…</p>}
-            {!chats.isLoading && (chats.data?.length ?? 0) === 0 && (
-              <p className="text-xs text-muted-foreground">
-                Your saved research chats will appear here.
-              </p>
-            )}
-            <ul className="space-y-1">
-              {(chats.data ?? []).map((row) => (
-                <li key={row.id} className="group flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => openChat(row)}
-                    className={`flex-1 text-left px-3 py-2 rounded-lg text-xs truncate hover:bg-secondary ${
-                      chatId === row.id ? "bg-secondary font-semibold" : "text-muted-foreground"
-                    }`}
-                    title={row.title}
-                  >
-                    {row.title}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      deleteChat.mutate(row.id);
-                      if (chatId === row.id) newChat();
-                    }}
-                    aria-label={`Delete ${row.title}`}
-                    className="opacity-0 group-hover:opacity-100 px-2 text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    ×
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </aside>
-        )}
-
-        <div className="flex-1 min-w-0 bg-card rounded-2xl shadow-panel border border-border overflow-hidden grid lg:grid-cols-12">
-          {/* ---------------- Left: student input ---------------- */}
-          <div className="lg:col-span-5 p-8 bg-background border-b lg:border-b-0 lg:border-r border-border">
-            <Label>Your research goal, in your own words</Label>
-            <textarea
-              rows={5}
-              value={goal}
-              onChange={(e) => {
-                setGoal(e.target.value);
-                if (stage !== "request") reset();
-              }}
-              placeholder="e.g. I'm writing a psychology paper examining whether social media use is associated with lower self-esteem among teenagers."
-              className="w-full bg-card border border-input rounded-lg p-4 text-sm focus:outline-none focus:ring-2 focus:ring-ring/40 resize-none"
-            />
-            <p className="mt-2 text-xs text-muted-foreground">
-              Larry does not write, refine, or suggest research goals. Your wording is used only to
-              build a profile you confirm.
-            </p>
-
-            <div className="mt-8">
-              <Label>Required source types</Label>
-              <div className="flex flex-wrap gap-2">
-                {SOURCE_TYPES.map((t) => {
-                  const on = types.includes(t);
-                  return (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => {
-                        toggleType(t);
-                        if (stage !== "request") reset();
-                      }}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                        on
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "border-input text-muted-foreground hover:bg-secondary"
-                      }`}
-                    >
-                      {t}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={analyze}
-              disabled={!goal.trim() || stage !== "request"}
-              className="mt-8 w-full bg-primary text-primary-foreground py-3 rounded-lg font-semibold hover:shadow-lg transition-shadow disabled:opacity-40"
-            >
-              Analyze my request
-            </button>
-
-            {stage !== "request" && (
+          {session && (
+            <aside className="w-full lg:w-64 shrink-0 bg-card rounded-2xl border border-border shadow-panel p-5">
+              <p className="text-[10px] uppercase tracking-wider font-bold mb-3">Previous chats</p>
               <button
                 type="button"
-                onClick={reset}
-                className="mt-3 w-full border border-input py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-muted-foreground hover:bg-secondary"
+                onClick={newChat}
+                className="w-full bg-primary text-primary-foreground py-2 rounded-lg text-xs font-bold uppercase tracking-wider mb-4"
               >
-                Start over
+                New research chat
               </button>
-            )}
+              {chats.isLoading && <p className="text-xs text-muted-foreground">Loading…</p>}
+              {!chats.isLoading && (chats.data?.length ?? 0) === 0 && (
+                <p className="text-xs text-muted-foreground">Your saved research chats will appear here.</p>
+              )}
+              <ul className="space-y-1">
+                {(chats.data ?? []).map((row) => (
+                  <li key={row.id} className="group flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => openChat(row)}
+                      className={`flex-1 text-left px-3 py-2 rounded-lg text-xs truncate hover:bg-secondary ${
+                        chatId === row.id ? "bg-secondary font-semibold" : "text-muted-foreground"
+                      }`}
+                      title={row.title}
+                    >
+                      {row.title}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        deleteChat.mutate(row.id);
+                        if (chatId === row.id) newChat();
+                      }}
+                      aria-label={`Delete ${row.title}`}
+                      className="opacity-0 group-hover:opacity-100 px-2 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </aside>
+          )}
 
-            {analysis && stage === "request" && analysis.ambiguousTerms.length > 0 && (
-              <p className="mt-4 text-xs text-accent">
-                Larry has spotted a broad term in your request and will ask you to specify it — it
-                will not choose a focus for you.
-              </p>
-            )}
-          </div>
-
-          {/* ---------------- Right: workflow ---------------- */}
-          <div className="lg:col-span-7 p-8">
-            <div className="flex items-center justify-between pb-4 border-b border-border mb-6">
-              <h2 className="font-serif text-2xl italic text-accent">
-                Where to look at {institution.shortName}
-              </h2>
+          <div className="flex-1 min-w-0 bg-card rounded-2xl shadow-panel border border-border overflow-hidden">
+            <div className="flex items-center justify-between px-8 py-4 border-b border-border">
+              <h2 className="font-serif text-2xl italic text-accent">Larry · research assistant</h2>
               <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
-                Licensed resources only
+                Your scope, your choices
               </span>
             </div>
 
-            {stage === "request" && (
-              <p className="text-sm text-muted-foreground">
-                Enter your goal and requirements. Larry will analyze the request, ask about anything
-                ambiguous, and build a research profile for you to confirm before any database is
-                searched.
-              </p>
-            )}
-
-            {/* Stage 3 — clarification */}
-            {stage === "clarify" && (
-              <div className="space-y-6">
-                <p className="text-sm text-muted-foreground">
-                  Larry needs you to specify a few things before building your research profile.
-                  Larry will not choose any of these for you.
-                </p>
-                {questions.map((q) => (
-                  <div key={q.id} className="border border-border rounded-xl p-5 bg-background">
-                    <p className="text-sm font-semibold mb-2">{q.question}</p>
-                    <p className="text-xs text-muted-foreground mb-3">
-                      Examples only: {q.examples.join(" · ")}
-                    </p>
-                    <input
-                      value={answers[q.id] ?? ""}
-                      onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
-                      placeholder="Your answer, in your own words"
-                      className="w-full bg-card border border-input rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/40"
-                    />
-                    <p className="mt-2 text-[11px] text-muted-foreground">{q.helper}</p>
+            <div className="px-8 py-6 space-y-4 max-h-[60vh] overflow-y-auto">
+              {messages.map((m, i) => (
+                <div key={i} className={m.role === "user" ? "flex justify-end" : "flex"}>
+                  <div
+                    className={
+                      m.role === "user"
+                        ? "max-w-[80%] bg-primary text-primary-foreground rounded-2xl rounded-br-sm px-4 py-2.5 text-sm whitespace-pre-wrap"
+                        : "max-w-[85%] text-sm whitespace-pre-wrap leading-relaxed"
+                    }
+                  >
+                    {m.content}
                   </div>
-                ))}
+                </div>
+              ))}
+              {busy && <p className="text-sm text-muted-foreground italic">Larry is reading your request…</p>}
+
+              {profile && (stage === "confirm" || stage === "searching") && (
+                <ProfileCard profile={profile} searching={stage === "searching"} onConfirm={confirmAndSearch} />
+              )}
+
+              {stage === "searching" && (
+                <p className="text-sm text-muted-foreground italic">
+                  Searching {institutionName}'s resources and checking results against your requirements…
+                </p>
+              )}
+
+              {stage === "results" && result?.kind === "results" && <Results result={result} />}
+
+              <div ref={endRef} />
+            </div>
+
+            <div className="border-t border-border p-4 bg-background">
+              {stage === "blocked" ? (
                 <button
                   type="button"
-                  onClick={submitAnswers}
-                  disabled={questions.some((q) => !answers[q.id]?.trim())}
-                  className="bg-primary text-primary-foreground px-5 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-40"
+                  onClick={newChat}
+                  className="w-full bg-primary text-primary-foreground py-3 rounded-lg text-sm font-semibold"
                 >
-                  Build my research profile
+                  Start a new request
                 </button>
-              </div>
-            )}
-
-            {/* Stage 5/6 — profile + confirmation */}
-            {stage === "profile" && profile && (
-              <div className="space-y-6">
-                <div className="border border-border rounded-xl overflow-hidden">
-                  <div className="px-5 py-3 bg-secondary/50 border-b border-border">
-                    <p className="text-[10px] uppercase tracking-wider font-bold">
-                      Research profile — student-provided information
-                    </p>
-                  </div>
-                  <dl className="divide-y divide-border text-sm">
-                    {[
-                      profile.discipline,
-                      profile.goal,
-                      profile.topic,
-                      profile.population,
-                      profile.dateRange,
-                      profile.sourceCount,
-                    ].map((f) => (
-                      <div key={f.label} className="px-5 py-3 grid sm:grid-cols-3 gap-2">
-                        <dt className="text-xs text-muted-foreground uppercase tracking-wider font-bold">
-                          {f.label}
-                        </dt>
-                        <dd
-                          className={`sm:col-span-2 ${
-                            f.origin === "pending" ? "text-muted-foreground italic" : ""
-                          }`}
-                        >
-                          {f.value}
-                        </dd>
-                      </div>
-                    ))}
-                    <div className="px-5 py-3 grid sm:grid-cols-3 gap-2">
-                      <dt className="text-xs text-muted-foreground uppercase tracking-wider font-bold">
-                        Concepts / variables
-                      </dt>
-                      <dd className="sm:col-span-2">
-                        {profile.concepts.length ? profile.concepts.join(", ") : "—"}
-                      </dd>
-                    </div>
-                    <div className="px-5 py-3 grid sm:grid-cols-3 gap-2">
-                      <dt className="text-xs text-muted-foreground uppercase tracking-wider font-bold">
-                        Source types
-                      </dt>
-                      <dd className="sm:col-span-2">{profile.sourceTypes.join(", ") || "—"}</dd>
-                    </div>
-                  </dl>
-                </div>
-
-                <p className="text-xs text-muted-foreground">
-                  Everything above came from you. Larry has not added research concepts, and will
-                  not search any database until you confirm this profile.
-                </p>
-
-                <div className="flex flex-wrap gap-3">
+              ) : (
+                <div className="flex gap-2 items-end">
+                  <textarea
+                    ref={inputRef}
+                    autoFocus
+                    rows={2}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        void send();
+                      }
+                    }}
+                    placeholder={
+                      stage === "confirm"
+                        ? "Confirm above, or type a correction…"
+                        : stage === "results"
+                          ? "Want to change a requirement? Tell Larry…"
+                          : "Describe your research need in your own words…"
+                    }
+                    className="flex-1 bg-card border border-input rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring/40 resize-none"
+                  />
                   <button
                     type="button"
-                    onClick={confirmAndSearch}
-                    className="bg-primary text-primary-foreground px-5 py-2.5 rounded-lg text-sm font-semibold"
+                    onClick={() => void send()}
+                    disabled={!input.trim() || busy || stage === "searching"}
+                    className="bg-primary text-primary-foreground px-5 py-3 rounded-lg text-sm font-semibold disabled:opacity-40"
                   >
-                    This is correct — continue
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setStage(questions.length ? "clarify" : "request")}
-                    className="border border-input px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-secondary"
-                  >
-                    Correct my profile
+                    Send
                   </button>
                 </div>
-              </div>
-            )}
-
-            {/* Stages 7-10 — terms, resource, search */}
-            {stage === "search" && terms && (
-              <div className="space-y-6">
-                <div className="border border-border rounded-xl p-5 bg-background">
-                  <p className="text-[10px] uppercase tracking-wider font-bold mb-3">
-                    Larry-generated search terminology
-                  </p>
-                  <code className="block text-xs leading-relaxed bg-secondary/50 rounded-lg p-4 break-words">
-                    {terms.query || "—"}
-                  </code>
-                  <ul className="mt-3 text-xs text-muted-foreground space-y-1">
-                    {terms.groups.map((g) => (
-                      <li key={g.concept}>
-                        <span className="text-accent">—</span> {g.concept}: {g.terms.join(" OR ")}
-                      </li>
-                    ))}
-                  </ul>
-                  {terms.filters.length > 0 && (
-                    <p className="mt-3 text-xs text-muted-foreground">
-                      Filters applied: {terms.filters.join(" · ")}
-                    </p>
-                  )}
-                  <p className="mt-3 text-[11px] text-muted-foreground">
-                    This is database vocabulary for your confirmed concepts only. Your original
-                    message is never sent to the database.
-                  </p>
-                </div>
-
-                {terms.narrow && !broadenAcknowledged && (
-                  <div className="border border-accent/40 rounded-xl p-5">
-                    <p className="text-sm">
-                      These criteria are quite narrow and may return few results. Would you like to
-                      broaden the search? Larry will not change your scope unless you choose to.
-                    </p>
-                    <div className="flex gap-3 mt-3">
-                      <button
-                        type="button"
-                        onClick={() => setBroadenAcknowledged(true)}
-                        className="border border-input px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider hover:bg-secondary"
-                      >
-                        Keep my scope
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setStage("profile")}
-                        className="border border-input px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider hover:bg-secondary"
-                      >
-                        Let me edit the profile
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {choices.length === 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    No licensed resource at {institution.name} matched this profile. Contact a
-                    reference librarian about interlibrary loan.
-                  </p>
-                )}
-
-                {choices.map((choice, i) => {
-                  const selected = execution?.resource.id === choice.resource.id;
-                  return (
-                    <div
-                      key={choice.resource.id}
-                      className={`border rounded-xl p-5 bg-background ${
-                        selected ? "border-accent" : "border-border"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-4 mb-1">
-                        <h3 className="font-semibold">{choice.resource.name}</h3>
-                        <span className="shrink-0 text-[10px] uppercase font-bold tracking-wider px-2 py-1 rounded-full bg-accent/10 text-accent">
-                          {i === 0 ? "Best match" : choice.resource.kind}
-                        </span>
-                      </div>
-                      <p className="text-xs text-muted-foreground mb-3">
-                        {choice.resource.provider} · Access via {choice.resource.auth}
-                      </p>
-                      <ul className="text-sm text-muted-foreground space-y-1 mb-4">
-                        {choice.reasons.map((r) => (
-                          <li key={r} className="flex gap-2">
-                            <span className="text-accent">—</span> {r}
-                          </li>
-                        ))}
-                      </ul>
-                      {selected ? (
-                        <a
-                          href={execution!.accessUrl || "#"}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex text-xs font-bold uppercase tracking-wider underline decoration-accent underline-offset-4"
-                        >
-                          Run this query via {institution.shortName} login ↗
-                        </a>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => runWith(choice)}
-                          className="text-xs font-bold uppercase tracking-wider text-muted-foreground underline underline-offset-4"
-                        >
-                          Search here instead
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-
-                {execution && (
-                  <div className="border border-border rounded-xl p-5">
-                    <p className="text-[10px] uppercase tracking-wider font-bold mb-2">
-                      Search handoff
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Larry submits the structured query above to{" "}
-                      <span className="text-foreground">{execution.resource.name}</span> through your
-                      institution's authenticated access. Result records (title, author, journal,
-                      date, DOI, availability) come from the provider — Larry does not summarize,
-                      explain, or evaluate them.
-                    </p>
-                  </div>
-                )}
-
-                <p className="text-xs text-muted-foreground border-t border-border pt-4">
-                  Larry does not read, summarize, or evaluate sources. Reading, judging, and
-                  selecting them is your work.
-                </p>
-              </div>
-            )}
+              )}
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                Larry does not write papers, suggest topics, or summarize sources. Larry will not change
+                your scope unless you choose to.
+              </p>
+            </div>
           </div>
-        </div>
         </div>
       </main>
 
@@ -670,8 +372,8 @@ function WidgetPage() {
             </button>
           </div>
           <p className="text-sm text-muted-foreground">
-            Create a free student account to save your research chats. Larry works the same either
-            way — guest sessions simply aren't saved.
+            Create a free student account to save your research chats. Larry works the same either way —
+            guest sessions simply aren't saved.
           </p>
           <div className="flex gap-2 mt-4">
             <Link
@@ -692,6 +394,140 @@ function WidgetPage() {
       )}
 
       <SiteFooter />
+    </div>
+  );
+}
+
+function ProfileCard({
+  profile,
+  searching,
+  onConfirm,
+}: {
+  profile: ResearchProfile;
+  searching: boolean;
+  onConfirm: () => void;
+}) {
+  const rows = PROFILE_ROWS.map((r) => ({ ...r, v: r.value(profile) })).filter((r) => r.v);
+  return (
+    <div className="border border-border rounded-xl overflow-hidden bg-background">
+      <div className="px-5 py-3 bg-secondary/50 border-b border-border flex justify-between gap-3">
+        <p className="text-[10px] uppercase tracking-wider font-bold">Your research profile</p>
+        <p className="text-[10px] text-muted-foreground">
+          <span className="font-bold text-foreground">You</span> = you said it ·{" "}
+          <span className="font-bold text-accent">Organized</span> = Larry's reading of your words
+        </p>
+      </div>
+      <dl className="divide-y divide-border text-sm">
+        {rows.map((r) => {
+          const mine = profile.studentProvided.includes(r.key);
+          return (
+            <div key={r.key} className="px-5 py-2.5 grid sm:grid-cols-4 gap-2 items-baseline">
+              <dt className="text-xs text-muted-foreground uppercase tracking-wider font-bold">{r.label}</dt>
+              <dd className="sm:col-span-3 flex justify-between gap-3">
+                <span>{r.v}</span>
+                <span className={`text-[10px] uppercase font-bold ${mine ? "text-foreground" : "text-accent"}`}>
+                  {mine ? "You" : "Organized"}
+                </span>
+              </dd>
+            </div>
+          );
+        })}
+        {profile.searchVocabulary.length > 0 && (
+          <div className="px-5 py-2.5 grid sm:grid-cols-4 gap-2">
+            <dt className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Search vocabulary</dt>
+            <dd className="sm:col-span-3 text-xs text-muted-foreground">
+              {profile.searchVocabulary.join(", ")} — related terms Larry will use to search your own concepts.
+            </dd>
+          </div>
+        )}
+      </dl>
+      <div className="px-5 py-4 border-t border-border flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={onConfirm}
+          disabled={searching}
+          className="bg-primary text-primary-foreground px-5 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-40"
+        >
+          {searching ? "Searching…" : "Confirm & search"}
+        </button>
+        <span className="text-xs text-muted-foreground">Something wrong? Type a correction below.</span>
+      </div>
+    </div>
+  );
+}
+
+function Results({ result }: { result: Extract<SearchResult, { kind: "results" }> }) {
+  return (
+    <div className="space-y-5">
+      {result.narrowNotice && (
+        <p className="text-sm border border-accent/40 bg-accent/5 rounded-xl p-4">{result.narrowNotice}</p>
+      )}
+
+      {result.sources.length > 0 && (
+        <div>
+          <Label>Sources found ({result.sources.length})</Label>
+          <ol className="space-y-3">
+            {result.sources.map((s, i) => (
+              <li key={s.id} className="border border-border rounded-xl p-4 bg-background">
+                <div className="flex justify-between gap-3">
+                  <p className="font-semibold text-sm">
+                    {i + 1}. {s.title}
+                  </p>
+                  <span
+                    className={`shrink-0 text-[10px] uppercase font-bold ${s.match === "strong" ? "text-accent" : "text-muted-foreground"}`}
+                  >
+                    {s.match === "strong" ? "Strong match" : "Partial match"}
+                  </span>
+                </div>
+                {s.authors.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">{s.authors.join(", ")}</p>
+                )}
+                <p className="text-xs mt-1">
+                  {[s.container, s.year, s.sourceType].filter(Boolean).join(" · ")}
+                </p>
+                <p className="text-xs mt-1 text-muted-foreground">
+                  Peer review: {s.peerReviewed ? "flagged peer-reviewed by provider" : "not verified"} · Found in{" "}
+                  <span className="text-foreground">{s.foundIn}</span>
+                  {s.doi && <> · DOI {s.doi}</>}
+                </p>
+                {s.matchNote && <p className="text-xs mt-2 italic">Why it's listed: {s.matchNote}</p>}
+                <a
+                  href={s.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-block mt-3 text-xs font-bold uppercase tracking-wider text-accent hover:underline"
+                >
+                  Open source →
+                </a>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+
+      {result.runs.length > 0 && (
+        <details className="text-xs text-muted-foreground">
+          <summary className="cursor-pointer">Where Larry searched</summary>
+          <ul className="mt-2 space-y-1">
+            {result.runs.map((r) => (
+              <li key={r.resource}>
+                <span className="text-foreground">{r.resource}</span> — {r.status === "error" ? `unavailable (${r.message})` : `${r.count} records`} · query: <code>{r.query}</code>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+
+      {result.notYetSearchable.length > 0 && (
+        <div className="text-xs text-muted-foreground border-t border-border pt-4">
+          <Label>Also licensed by your library — Larry can't search these automatically yet</Label>
+          <p>{result.notYetSearchable.join(" · ")}</p>
+        </div>
+      )}
+
+      <p className="text-xs text-muted-foreground border-t border-border pt-4">
+        Larry does not read, summarize, or evaluate sources. Reading, judging, and selecting them is your work.
+      </p>
     </div>
   );
 }
