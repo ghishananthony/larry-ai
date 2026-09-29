@@ -82,7 +82,7 @@ export async function runSearch(profile: ResearchProfile, resources: TenantResou
     const ratings = parseJson<{ ratings?: { id: string; match: string; note: string }[] }>(rankOut).ratings ?? [];
     const byId = new Map(ratings.map((x) => [x.id, x]));
     sources = pool
-      .map((r) => {
+      .map((r): SourceRecord | null => {
         const x = byId.get(r.id);
         if (!x || (x.match !== "strong" && x.match !== "partial")) return null;
         return { ...r, match: x.match as "strong" | "partial", matchNote: String(x.note ?? "").slice(0, 140) };
