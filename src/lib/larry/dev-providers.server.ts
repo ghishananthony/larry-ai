@@ -18,7 +18,7 @@ const openalex: SearchAdapter = {
   capabilities:
     "OpenAlex (development test provider; cross-disciplinary scholarly works index). Plain keywords; supports AND/OR/NOT and quoted phrases. Date and article-type filters are applied automatically.",
   async search(query, profile, limit) {
-    const key = process.env.OPENALEX_API_KEY;
+    const key = process.env['OPENALEX_API_KEY'];
     if (!key) throw new Error("OpenAlex test provider is not configured");
     const filters: string[] = [];
     if (profile.yearFrom) filters.push(`from_publication_date:${profile.yearFrom}-01-01`);
@@ -58,18 +58,18 @@ const DEV_ADAPTERS: Record<string, SearchAdapter> = { openalex };
 
 function isDevHost(host: string | null | undefined): boolean {
   if (!host) return false;
-  const h = host.toLowerCase().split(":")[0];
+  const h = host.toLowerCase().split(":")[0] ?? "";
   return h === "localhost" || h === "127.0.0.1" || h.startsWith("id-preview--") || h.endsWith("-dev.lovable.app");
 }
 
 /** Returns the dev adapters enabled for this request; empty (fail closed) otherwise. */
 export function enabledDevAdapters(host: string | null | undefined): SearchAdapter[] {
   if (!isDevHost(host)) return [];
-  const flag = process.env.LARRY_DEV_PROVIDERS ?? "";
+  const flag = process.env['LARRY_DEV_PROVIDERS'] ?? "";
   return flag
     .split(",")
     .map((s) => s.trim().toLowerCase())
-    .filter((id) => DEV_ADAPTERS[id])
-    .map((id) => DEV_ADAPTERS[id])
-    .filter((a) => a !== openalex || !!process.env.OPENALEX_API_KEY);
+    .filter((id) => id in DEV_ADAPTERS)
+    .map((id) => DEV_ADAPTERS[id] as SearchAdapter)
+    .filter((a) => a !== openalex || !!process.env['OPENALEX_API_KEY']);
 }
