@@ -13,3 +13,4 @@
 - Search adapters are keyed by exact resource name and only run when the caller's institution (resolved server-side, never from the client) lists that resource as active/trial. Why: the institution's configuration is authoritative for access.
 - Larry search requires a server-signed confirmation token (src/lib/larry/confirm.server.ts) issued only when a profile is presented for confirmation. Why: direct API calls cannot skip confirmation or search a tampered profile.
 - Publisher platforms without a public search API are searched via Crossref metadata filtered to that publisher's member id. Why: real registered records, no scraping.
+- Dev/test-only search providers (e.g. OpenAlex) live in src/lib/larry/dev-providers.server.ts, enabled only by server secret LARRY_DEV_PROVIDERS on preview/localhost hosts and never as institution resources. Why: test real searches without touching licensed-resource authorization.
