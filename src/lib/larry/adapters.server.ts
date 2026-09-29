@@ -150,12 +150,12 @@ const gutenberg: SearchAdapter = {
  * restricted to that publisher's Crossref member id. Records are real DOIs
  * registered by the publisher; full text still depends on the library's license.
  */
-function crossrefPublisher(resource: string, member: number, desc: string): SearchAdapter {
+function crossrefPublisher(resource: string, member: number, desc: string, extra: string[] = []): SearchAdapter {
   return {
     resource,
     capabilities: `${desc} Searched via Crossref bibliographic metadata: plain keywords/phrases only (no Boolean operators, no field tags), 3-8 words.`,
     async search(query, profile, limit) {
-      const filters = [`member:${member}`, "type:journal-article"];
+      const filters = [`member:${member}`, "type:journal-article", ...extra];
       if (profile.yearFrom) filters.push(`from-pub-date:${profile.yearFrom}`);
       if (profile.yearTo) filters.push(`until-pub-date:${profile.yearTo}`);
       const params = new URLSearchParams({
@@ -188,9 +188,7 @@ function crossrefPublisher(resource: string, member: number, desc: string): Sear
 const tandf = crossrefPublisher("Taylor & Francis Online", 301, "Taylor & Francis journals (social sciences, humanities, psychology, education, business, science).");
 const mitPress = crossrefPublisher("MIT Press Journals", 281, "MIT Press journals (economics, cognitive science, arts, computing, international affairs).");
 const scienceDirect = crossrefPublisher("ScienceDirect", 78, "Elsevier/ScienceDirect journals (sciences, health, psychology, social sciences, business).");
-const annualPsych: SearchAdapter = {
-  ...crossrefPublisher("Annual Review of Psychology", 22, "Annual Reviews (review articles; psychology)."),
-};
+const annualPsych = crossrefPublisher("Annual Review of Psychology", 22, "Annual Review of Psychology (review articles in psychology only).", ["issn:0066-4308"]);
 
 export const ADAPTERS: SearchAdapter[] = [pubmed, eric, oapen, gutenberg, tandf, mitPress, scienceDirect, annualPsych];
 export const adapterFor = (resourceName: string) => ADAPTERS.find((a) => a.resource === resourceName);
