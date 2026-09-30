@@ -1,5 +1,4 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import adminPreview from "@/assets/admin-dashboard-preview.jpg";
 import { SiteFooter, SiteNav } from "@/components/SiteNav";
 import { LaurelLineArt, OwlLineArt, TempleLineArt } from "@/components/ClassicalArt";
 import { useInstitutionAccess } from "@/hooks/useInstitutionAccess";
@@ -33,12 +32,12 @@ function Index() {
       <SiteNav />
 
       <div className="relative overflow-hidden">
-        <LaurelLineArt className="pointer-events-none absolute -left-6 top-16 h-[420px] w-auto text-line-art opacity-[0.18]" />
-        <div className="pointer-events-none absolute right-[-60px] top-10 hidden md:block w-[600px] text-line-art opacity-[0.14]">
-          <OwlLineArt className="absolute left-[352px] top-[76px] w-5" />
-          <TempleLineArt className="mt-8 w-full h-auto" />
+        <LaurelLineArt className="pointer-events-none absolute -left-4 top-24 z-0 h-[520px] w-auto text-line-art opacity-[0.2]" />
+        <div className="pointer-events-none absolute right-[-140px] top-6 z-0 hidden lg:block w-[760px] text-line-art opacity-[0.13]">
+          <OwlLineArt className="absolute left-1/2 top-0 w-6 -translate-x-1/2" />
+          <TempleLineArt className="mt-[26px] w-full h-auto" />
         </div>
-      <header className="relative max-w-7xl mx-auto px-8 py-20 grid lg:grid-cols-2 gap-16 items-center">
+      <header className="relative z-10 max-w-7xl mx-auto px-8 py-24 grid lg:grid-cols-2 gap-16 items-center">
         <div>
           <span className="inline-block px-3 py-1 bg-accent/10 text-accent text-xs font-bold tracking-widest uppercase mb-6">
             For Academic Institutions
@@ -202,15 +201,35 @@ function Index() {
               </li>
             </ul>
           </div>
-          <div className="p-8 md:w-2/3 bg-sidebar-accent">
-            <img
-              src={adminPreview}
-              alt="Larry admin console showing library resource usage charts and active database connections"
-              width={1536}
-              height={1024}
-              loading="lazy"
-              className="w-full rounded-xl border border-sidebar-border"
-            />
+          <div className="p-8 md:w-2/3 bg-background">
+            <div className="rounded-xl border border-border bg-card overflow-hidden" aria-hidden="true">
+              <div className="flex items-center justify-between border-b border-border px-5 py-3">
+                <span className="font-serif text-lg">Library resources</span>
+                <span className="text-xs text-muted-foreground">Menlo College</span>
+              </div>
+              <div className="grid grid-cols-3 gap-4 p-5">
+                {[
+                  ["Active databases", "72"],
+                  ["Proxy", "EZproxy"],
+                  ["Sign-in", "Shibboleth"],
+                ].map(([k, v]) => (
+                  <div key={k} className="rounded-lg border border-border bg-background p-4">
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">{k}</p>
+                    <p className="mt-1 font-serif text-2xl text-foreground">{v}</p>
+                  </div>
+                ))}
+              </div>
+              <ul className="divide-y divide-border border-t border-border text-sm">
+                {["PubMed", "ERIC", "ScienceDirect", "Taylor & Francis Online", "JSTOR"].map((n, i) => (
+                  <li key={n} className="flex items-center justify-between px-5 py-3">
+                    <span>{n}</span>
+                    <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${i < 4 ? "bg-accent/10 text-accent" : "bg-muted text-muted-foreground"}`}>
+                      {i < 4 ? "Visible" : "Hidden"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </div>
       </section>
