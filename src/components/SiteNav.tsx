@@ -3,15 +3,20 @@ import { useAuth } from "@/hooks/useAuth";
 import { useInstitutionAccess } from "@/hooks/useInstitutionAccess";
 
 export function LarryMark({ size = "md" }: { size?: "sm" | "md" }) {
-  const box = size === "sm" ? "size-6" : "size-8";
-  const glyph = size === "sm" ? "text-sm" : "text-xl";
+  const box = size === "sm" ? "size-7" : "size-9";
+  const glyph = size === "sm" ? "text-base" : "text-xl";
   const word = size === "sm" ? "text-lg" : "text-2xl";
   return (
-    <span className="flex items-center gap-2">
-      <span className={`${box} bg-primary rounded-sm flex items-center justify-center`}>
-        <span className={`text-accent font-serif font-bold ${glyph}`}>L</span>
+    <span className="flex items-center gap-2.5">
+      <span
+        className={`${box} relative bg-accent rounded-md flex items-center justify-center shadow-sm`}
+      >
+        <span className="absolute inset-[3px] rounded-[4px] border border-accent-foreground/40" />
+        <span className={`relative text-accent-foreground font-serif font-semibold ${glyph} leading-none`}>
+          L
+        </span>
       </span>
-      <span className={`font-serif ${word} font-bold tracking-tight`}>Larry</span>
+      <span className={`font-serif ${word} font-semibold tracking-tight`}>Larry</span>
     </span>
   );
 }
@@ -46,7 +51,7 @@ export function SiteNav() {
         ) : (
           <Link
             to="/auth"
-            className="bg-primary text-primary-foreground px-5 py-2 rounded-full hover:bg-primary/90 transition-all"
+            className="bg-accent text-accent-foreground px-5 py-2 rounded-full hover:bg-accent/90 transition-all"
           >
             Student sign in
           </Link>
