@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import adminPreview from "@/assets/admin-dashboard-preview.jpg";
 import { SiteFooter, SiteNav } from "@/components/SiteNav";
+import { LaurelLineArt, OwlLineArt, TempleLineArt } from "@/components/ClassicalArt";
 import { useInstitutionAccess } from "@/hooks/useInstitutionAccess";
 
 export const Route = createFileRoute("/")({
@@ -31,7 +32,13 @@ function Index() {
     <div className="min-h-screen bg-background font-sans text-foreground">
       <SiteNav />
 
-      <header className="max-w-7xl mx-auto px-8 py-20 grid lg:grid-cols-2 gap-16 items-center">
+      <div className="relative overflow-hidden">
+        <LaurelLineArt className="pointer-events-none absolute -left-6 top-16 h-[420px] w-auto text-line-art opacity-[0.18]" />
+        <div className="pointer-events-none absolute right-[-60px] top-10 hidden md:block w-[600px] text-line-art opacity-[0.14]">
+          <OwlLineArt className="absolute left-[400px] -top-1 w-5" />
+          <TempleLineArt className="mt-8 w-full h-auto" />
+        </div>
+      <header className="relative max-w-7xl mx-auto px-8 py-20 grid lg:grid-cols-2 gap-16 items-center">
         <div>
           <span className="inline-block px-3 py-1 bg-accent/10 text-accent text-xs font-bold tracking-widest uppercase mb-6">
             For Academic Institutions
@@ -107,6 +114,7 @@ function Index() {
           <div className="absolute -bottom-6 -left-6 bg-accent size-24 -z-10 rounded-full opacity-20 blur-2xl" />
         </div>
       </header>
+      </div>
 
       <section className="bg-card py-24">
         <div className="max-w-7xl mx-auto px-8">
