@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import adminPreview from "@/assets/admin-dashboard-preview.jpg";
 import { SiteFooter, SiteNav } from "@/components/SiteNav";
-import { LaurelLineArt, OwlLineArt, TempleLineArt } from "@/components/ClassicalArt";
+import heroBg from "@/assets/larry-hero-background.jpg.asset.json";
 import { useInstitutionAccess } from "@/hooks/useInstitutionAccess";
 
 export const Route = createFileRoute("/")({
@@ -30,15 +30,12 @@ function Index() {
   const access = useInstitutionAccess();
   return (
     <div className="min-h-screen bg-background font-sans text-foreground">
-      <SiteNav />
-
-      <div className="relative overflow-hidden">
-        <LaurelLineArt className="pointer-events-none absolute -left-10 top-[140px] z-0 h-[600px] w-auto text-line-art opacity-[0.28]" />
-        <div className="pointer-events-none absolute right-[-200px] top-0 z-0 hidden lg:block w-[880px] text-line-art opacity-[0.17]">
-          <OwlLineArt className="absolute left-[562px] top-[104px] w-7" />
-          <TempleLineArt className="mt-[26px] w-full h-auto" />
-        </div>
-      <header className="relative z-10 max-w-7xl mx-auto px-8 pt-36 pb-48 grid lg:grid-cols-[1.25fr_1fr] gap-12 items-center">
+      <div
+        className="relative overflow-hidden bg-background bg-cover bg-top bg-no-repeat lg:min-h-[66.6vw]"
+        style={{ backgroundImage: `url(${heroBg.url})` }}
+      >
+        <SiteNav />
+      <header className="relative z-10 max-w-[1320px] mx-auto px-8 lg:px-[8.8vw] xl:px-8 pt-24 lg:pt-[10vw] pb-24 grid lg:grid-cols-[1fr_513px] gap-12 items-start">
         <div>
           <span className="inline-block px-2.5 py-1 rounded bg-accent/10 text-accent text-xs font-semibold tracking-[0.14em] uppercase mb-6">
             For Academic Institutions
