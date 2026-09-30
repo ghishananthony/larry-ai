@@ -206,8 +206,8 @@ function Index() {
             <img
               src={adminPreview}
               alt="Larry admin console showing library resource usage charts and active database connections"
-              width={1200}
-              height={800}
+              width={1536}
+              height={1024}
               loading="lazy"
               className="w-full rounded-xl border border-sidebar-border"
             />
