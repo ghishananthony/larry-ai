@@ -108,7 +108,6 @@ function Index() {
               </div>
             </div>
           </div>
-          <div className="absolute -bottom-6 -left-6 bg-accent size-24 -z-10 rounded-full opacity-20 blur-2xl" />
         </div>
       </header>
       </div>
