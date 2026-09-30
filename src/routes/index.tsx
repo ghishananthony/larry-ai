@@ -33,7 +33,7 @@ function Index() {
 
       <div className="relative overflow-hidden">
         <LaurelLineArt className="pointer-events-none absolute -left-4 top-24 z-0 h-[520px] w-auto text-line-art opacity-[0.2]" />
-        <div className="pointer-events-none absolute right-[-40px] top-[60px] z-0 hidden lg:block w-[640px] text-line-art opacity-[0.16]">
+        <div className="pointer-events-none absolute right-[-110px] top-0 z-0 hidden lg:block w-[640px] text-line-art opacity-[0.16]">
           <OwlLineArt className="absolute left-1/2 top-[48px] w-6 -translate-x-1/2" />
           <TempleLineArt className="mt-[26px] w-full h-auto" />
         </div>
