@@ -35,7 +35,7 @@ function Index() {
       <div className="relative overflow-hidden">
         <LaurelLineArt className="pointer-events-none absolute -left-6 top-16 h-[420px] w-auto text-line-art opacity-[0.18]" />
         <div className="pointer-events-none absolute right-[-60px] top-10 hidden md:block w-[600px] text-line-art opacity-[0.14]">
-          <OwlLineArt className="absolute left-[400px] -top-1 w-5" />
+          <OwlLineArt className="absolute left-[352px] top-[76px] w-5" />
           <TempleLineArt className="mt-8 w-full h-auto" />
         </div>
       <header className="relative max-w-7xl mx-auto px-8 py-20 grid lg:grid-cols-2 gap-16 items-center">
