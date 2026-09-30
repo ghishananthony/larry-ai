@@ -38,12 +38,12 @@ function Index() {
           <OwlLineArt className="absolute left-[562px] top-[104px] w-7" />
           <TempleLineArt className="mt-[26px] w-full h-auto" />
         </div>
-      <header className="relative z-10 max-w-7xl mx-auto px-8 pt-40 pb-60 grid lg:grid-cols-[1.1fr_1fr] gap-12 items-center">
+      <header className="relative z-10 max-w-7xl mx-auto px-8 pt-36 pb-48 grid lg:grid-cols-[1.25fr_1fr] gap-12 items-center">
         <div>
           <span className="inline-block px-2.5 py-1 rounded bg-accent/10 text-accent text-xs font-semibold tracking-[0.14em] uppercase mb-6">
             For Academic Institutions
           </span>
-          <h1 className="font-serif text-5xl md:text-7xl leading-[1.08] tracking-tight mb-7">
+          <h1 className="font-serif text-5xl md:text-[64px] leading-[1.08] tracking-tight mb-7">
             Find resources faster,<br /><span className="text-accent italic">with Larry.</span>
           </h1>
           <p className="text-xl text-muted-foreground leading-relaxed mb-8 max-w-lg">
