@@ -35,7 +35,7 @@ function Index() {
         style={{ backgroundImage: `url(${heroBg.url})` }}
       >
         <SiteNav />
-      <header className="relative z-10 max-w-[1320px] mx-auto px-8 lg:px-[8.8vw] xl:px-8 pt-24 lg:pt-[10vw] pb-24 grid lg:grid-cols-[1fr_513px] gap-12 items-start">
+      <header className="relative z-10 max-w-[1320px] mx-auto px-8 lg:px-[8.8vw] xl:px-8 pt-24 lg:pt-[10vw] pb-24 xl:pr-[152px] grid lg:grid-cols-[1fr_513px] gap-12 items-start">
         <div>
           <span className="inline-block px-2.5 py-1 rounded bg-accent/10 text-accent text-xs font-semibold tracking-[0.14em] uppercase mb-6">
             For Academic Institutions
