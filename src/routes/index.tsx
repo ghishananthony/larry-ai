@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import adminPreview from "@/assets/admin-dashboard-preview.jpg";
 import { SiteFooter, SiteNav } from "@/components/SiteNav";
 import { LaurelLineArt, OwlLineArt, TempleLineArt } from "@/components/ClassicalArt";
 import { useInstitutionAccess } from "@/hooks/useInstitutionAccess";
@@ -32,18 +33,18 @@ function Index() {
       <SiteNav />
 
       <div className="relative overflow-hidden">
-        <LaurelLineArt className="pointer-events-none absolute -left-4 top-24 z-0 h-[520px] w-auto text-line-art opacity-[0.2]" />
-        <div className="pointer-events-none absolute right-[-110px] top-0 z-0 hidden lg:block w-[640px] text-line-art opacity-[0.16]">
-          <OwlLineArt className="absolute left-1/2 top-[48px] w-6 -translate-x-1/2" />
+        <LaurelLineArt className="pointer-events-none absolute -left-10 top-[140px] z-0 h-[600px] w-auto text-line-art opacity-[0.28]" />
+        <div className="pointer-events-none absolute right-[-200px] top-0 z-0 hidden lg:block w-[880px] text-line-art opacity-[0.17]">
+          <OwlLineArt className="absolute left-[562px] top-[104px] w-7" />
           <TempleLineArt className="mt-[26px] w-full h-auto" />
         </div>
-      <header className="relative z-10 max-w-7xl mx-auto px-8 py-24 grid lg:grid-cols-2 gap-16 items-center">
+      <header className="relative z-10 max-w-7xl mx-auto px-8 pt-40 pb-60 grid lg:grid-cols-[1.1fr_1fr] gap-12 items-center">
         <div>
-          <span className="inline-block px-3 py-1 bg-accent/10 text-accent text-xs font-bold tracking-widest uppercase mb-6">
+          <span className="inline-block px-2.5 py-1 rounded bg-accent/10 text-accent text-xs font-semibold tracking-[0.14em] uppercase mb-6">
             For Academic Institutions
           </span>
-          <h1 className="font-serif text-6xl leading-[1.1] mb-6">
-            Find resources faster, <span className="text-accent italic">with Larry.</span>
+          <h1 className="font-serif text-5xl md:text-7xl leading-[1.08] tracking-tight mb-7">
+            Find resources faster,<br /><span className="text-accent italic">with Larry.</span>
           </h1>
           <p className="text-xl text-muted-foreground leading-relaxed mb-8 max-w-lg">
             The AI research assistant that connects students to your library's licensed databases.
@@ -52,7 +53,7 @@ function Index() {
           <div className="flex flex-col sm:flex-row gap-4">
             <Link
               to="/widget"
-              className="bg-primary text-primary-foreground px-8 py-4 rounded-lg font-semibold hover:shadow-lg transition-shadow text-center"
+              className="bg-primary text-primary-foreground px-10 py-4 rounded-md font-semibold text-lg hover:shadow-lg transition-shadow text-center"
             >
               Try the student widget
             </Link>
@@ -201,35 +202,15 @@ function Index() {
               </li>
             </ul>
           </div>
-          <div className="p-8 md:w-2/3 bg-background">
-            <div className="rounded-xl border border-border bg-card overflow-hidden" aria-hidden="true">
-              <div className="flex items-center justify-between border-b border-border px-5 py-3">
-                <span className="font-serif text-lg">Library resources</span>
-                <span className="text-xs text-muted-foreground">Menlo College</span>
-              </div>
-              <div className="grid grid-cols-3 gap-4 p-5">
-                {[
-                  ["Active databases", "72"],
-                  ["Proxy", "EZproxy"],
-                  ["Sign-in", "Shibboleth"],
-                ].map(([k, v]) => (
-                  <div key={k} className="rounded-lg border border-border bg-background p-4">
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">{k}</p>
-                    <p className="mt-1 font-serif text-2xl text-foreground">{v}</p>
-                  </div>
-                ))}
-              </div>
-              <ul className="divide-y divide-border border-t border-border text-sm">
-                {["PubMed", "ERIC", "ScienceDirect", "Taylor & Francis Online", "JSTOR"].map((n, i) => (
-                  <li key={n} className="flex items-center justify-between px-5 py-3">
-                    <span>{n}</span>
-                    <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${i < 4 ? "bg-accent/10 text-accent" : "bg-muted text-muted-foreground"}`}>
-                      {i < 4 ? "Visible" : "Hidden"}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+          <div className="p-8 md:w-2/3 bg-sidebar-accent">
+            <img
+              src={adminPreview}
+              alt="Larry admin console showing library resource usage charts and active database connections"
+              width={1536}
+              height={1024}
+              loading="lazy"
+              className="w-full rounded-xl border border-sidebar-border"
+            />
           </div>
         </div>
       </section>

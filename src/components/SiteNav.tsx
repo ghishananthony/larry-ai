@@ -3,9 +3,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { useInstitutionAccess } from "@/hooks/useInstitutionAccess";
 
 export function LarryMark({ size = "md" }: { size?: "sm" | "md" }) {
-  const box = size === "sm" ? "size-7" : "size-9";
-  const glyph = size === "sm" ? "text-base" : "text-xl";
-  const word = size === "sm" ? "text-lg" : "text-2xl";
+  const box = size === "sm" ? "size-7" : "size-11";
+  const glyph = size === "sm" ? "text-base" : "text-2xl";
+  const word = size === "sm" ? "text-lg" : "text-4xl";
   return (
     <span className="flex items-center gap-2.5">
       <span
@@ -25,11 +25,12 @@ export function SiteNav() {
   const { session, loading } = useAuth();
   const access = useInstitutionAccess();
   return (
-    <nav className="flex items-center justify-between px-8 py-6 border-b border-border">
+    <nav className="border-b border-border">
+      <div className="max-w-[1320px] mx-auto flex items-center justify-between px-8 py-5">
       <Link to="/">
         <LarryMark />
       </Link>
-      <div className="hidden md:flex items-center gap-8 text-sm font-medium">
+      <div className="hidden md:flex items-center gap-8 font-serif text-[15px]">
         <Link to="/widget" className="hover:text-accent transition-colors">
           Student Widget
         </Link>
@@ -44,18 +45,19 @@ export function SiteNav() {
         {!loading && session ? (
           <Link
             to="/profile"
-            className="bg-primary text-primary-foreground px-5 py-2 rounded-full hover:bg-primary/90 transition-all"
+            className="bg-primary text-primary-foreground px-5 py-2 rounded-full font-sans font-semibold text-sm hover:bg-primary/90 transition-all"
           >
             Your account
           </Link>
         ) : (
           <Link
             to="/auth"
-            className="bg-accent text-accent-foreground px-5 py-2 rounded-full hover:bg-accent/90 transition-all"
+            className="bg-accent text-accent-foreground px-5 py-2 rounded-full font-sans font-semibold text-sm hover:bg-accent/90 transition-all"
           >
             Student sign in
           </Link>
         )}
+      </div>
       </div>
     </nav>
   );
